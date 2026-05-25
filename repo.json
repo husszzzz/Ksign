@@ -18,6 +18,15 @@
             "category": "utilities",
             "versions": [
                 {
+                    "downloadURL": "https://github.com/Nyasami/Ksign/releases/download/v1.6/Ksign.ipa",
+                    "size": 14000000,
+                    "version": "1.6",
+                    "buildVersion": "1",
+                    "date": "2026-05-25T21:17:37+07:00",
+                    "localizedDescription": "Hawoo everywan its been half a year since the last release I'm really sorry because ever since beta build I got lazy from release a new version, anyways\n\nThis version introduces:\n\n- Optimization for iOS 26\n- Bulk installation support for multiple apps\n- idevice installation method\n- Custom injection path & support for injecting tweaks into App Extensions\n- Support for .bundle files as tweaks (copied directly into the app bundle)\n- rsd support\n- Fix empty display name handling in Info.plist\n- Fix URL scheme issues for Ksign\n- Fix codesigning errors on specific apps with unusual bundle structures\n- Localization updates for German, Russian, Arabic, and Vietnamese",
+                    "minOSVersion": "16.0"
+                },
+                {
                     "downloadURL": "https://github.com/Nyasami/Ksign/releases/download/v1.5.1/Ksign.ipa",
                     "size": 14000000,
                     "version": "1.5.1",
@@ -64,10 +73,10 @@
                 }
             ],
             "appPermissions": {},
-            "version": "1.5.1",
-            "versionDate": "2025-12-18T01:41:00+07:00",
+            "version": "1.6",
+            "versionDate": "2026-05-25T21:17:37+07:00",
             "size": 14000000,
-            "downloadURL": "https://github.com/Nyasami/Ksign/releases/download/v1.5.1/Ksign.ipa"
+            "downloadURL": "https://github.com/Nyasami/Ksign/releases/download/v1.6/Ksign.ipa"
         }
     ]
 }
