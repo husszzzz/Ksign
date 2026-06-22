@@ -96,7 +96,6 @@ extension Storage {
 		let builtInSourceURLs = [
             "https://raw.githubusercontent.com/Nyasami/Ksign/refs/heads/main/repo.json",
             "https://community-apps.sidestore.io/sidecommunity.json",
-            "https://xitrix.github.io/iTorrent/AltStore.json",
             "https://github.com/LiveContainer/LiveContainer/releases/download/1.0/apps.json",
             "https://alt.crystall1ne.dev"
 		]
