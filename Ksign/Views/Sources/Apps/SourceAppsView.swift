@@ -61,7 +61,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // فلترة التطبيقات للبحث والشبكة (Grid)
+    // فلترة التطبيقات للبحث والشبكة (Grid) - تم التعديل هنا للتعامل مع الـ Optional
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all = [SourceAppRoute]()
@@ -72,7 +72,7 @@ struct SourceAppsView: View {
         }
         
         if !_searchText.isEmpty {
-            all = all.filter { $0.app.name.localizedCaseInsensitiveContains(_searchText) }
+            all = all.filter { ($0.app.name ?? "").localizedCaseInsensitiveContains(_searchText) }
         }
         return all
     }
@@ -264,9 +264,9 @@ struct AppCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             
-            // اسم التطبيق والإصدار
+            // اسم التطبيق والإصدار - تم التعديل هنا للتعامل مع الـ Optional
             VStack(spacing: 4) {
-                Text(route.app.name)
+                Text(route.app.name ?? "Unknown App")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .foregroundColor(.primary)
