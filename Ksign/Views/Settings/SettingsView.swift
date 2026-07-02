@@ -27,10 +27,11 @@ struct SettingsView: View {
         return _certificates[_storedSelectedCert]
     }
     
+    // 🛠️ عدل الروابط الثلاثة أدناه بما يناسبك:
+	private let _donationsUrl = "رابط_التبرع_الخاص_بك"
+	private let _githubUrl = "رابط_الجيت_هاب_الخاص_بك"
+    private let _discordUrl = "رابط_الديسكورد_الخاص_بك"
     
-	private let _donationsUrl = "https://github.com/sponsors/nyasami"
-	private let _githubUrl = "https://github.com/nyasami/ksign"
-    private let _discordUrl = "https://discord.gg/sfbZfQzVdQ"
 	// MARK: Body
     var body: some View {
 		NBNavigationView(.localized("Settings")) {
@@ -108,13 +109,14 @@ extension SettingsView {
 			NavigationLink(destination: AboutNyaView()) {
                 Label(.localized("About"), systemImage: "info.circle")
             }
-			Button(.localized("Telegram Channel"), systemImage: "paperplane.circle") {
-				UIApplication.open("https://t.me/KhoinDNS")
+            // 🛠️ هنا يمكنك كتابة اسم متجرك ورابط قناتك التليجرام مباشرة:
+			Button("قناة التليجرام", systemImage: "paperplane.circle") {
+				UIApplication.open("https://t.me/رابط_قناتك_هنا")
 			}
-			Button(.localized("GitHub Repository"), systemImage: "safari") {
+			Button("مستودع جيت هاب", systemImage: "safari") {
 				UIApplication.open(_githubUrl)
 			}
-            Button(.localized("Discord Server"), systemImage: "safari") {
+            Button("سيرفر ديسكورد", systemImage: "safari") {
                 UIApplication.open(_discordUrl)
             }
 		}
