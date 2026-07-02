@@ -3,6 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
+//  Modified for Hassany Store (Grid UI)
 //
 
 import SwiftUI
@@ -60,21 +61,40 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
+    // فلترة التطبيقات للبحث والشبكة (Grid)
+    private var _filteredApps: [SourceAppRoute] {
+        guard let sources = _sources else { return [] }
+        var all = [SourceAppRoute]()
+        for source in sources {
+            for app in source.apps {
+                all.append(SourceAppRoute(source: source, app: app))
+            }
+        }
+        
+        if !_searchText.isEmpty {
+            all = all.filter { $0.app.name.localizedCaseInsensitiveContains(_searchText) }
+        }
+        return all
+    }
+    
     // MARK: Body
     var body: some View {
         ZStack {
-            if
-                let _sources,
-                !_sources.isEmpty
-            {
-                SourceAppsTableRepresentableView(
-                    sources: _sources,
-                    searchText: $_searchText,
-                    sortOption: $_sortOption,
-                    sortAscending: $_sortAscending,
-                    onSelect: {self._selectedRoute = $0}
-                )
-                .ignoresSafeArea()
+            if let _sources, !_sources.isEmpty {
+                // التصميم الجديد: نظام الكارتات (Grid)
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                        ForEach(_filteredApps, id: \.id) { route in
+                            Button(action: {
+                                self._selectedRoute = route
+                            }) {
+                                AppCardView(route: route)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(16)
+                }
             } else {
                 if #available(iOS 17, *) {
                     ContentUnavailableView {
@@ -90,25 +110,19 @@ struct SourceAppsView: View {
         .navigationTitle(_navigationTitle)
         .searchable(text: $_searchText, placement: .platform())
         .toolbarTitleMenu {
-            if
-                let _sources,
-                _sources.count == 1
-            {
+            if let _sources, _sources.count == 1 {
                 if let url = _sources[0].website {
                     Button(.localized("Visit Website"), systemImage: "globe") {
                         UIApplication.open(url)
                     }
                 }
-                
                 if let url = _sources[0].patreonURL {
                     Button(.localized("Visit Patreon"), systemImage: "dollarsign.circle") {
                         UIApplication.open(url)
                     }
                 }
             }
-            
             Divider()
-            
             Button(.localized("Copy"), systemImage: "doc.on.doc") {
                 UIPasteboard.general.string = object.map {
                     $0.sourceURL!.absoluteString
@@ -161,12 +175,10 @@ struct SourceAppsView: View {
         .navigationDestinationIfAvailable(item: $_selectedRoute) { route in
             SourceAppsDetailView(source: route.source, app: route.app)
         }
-        
     }
     
     private func _load() {
         isLoading = true
-        
         Task {
             let loadedSources = object.compactMap { viewModel.sources[$0] }
             _sources = loadedSources
@@ -214,8 +226,6 @@ extension SourceAppsView {
     }
 }
 
-import SwiftUI
-
 extension View {
     @ViewBuilder
     func navigationDestinationIfAvailable<Item: Identifiable & Hashable, Destination: View>(
@@ -227,5 +237,58 @@ extension View {
         } else {
             self
         }
+    }
+}
+
+// MARK: - التصميم الجديد: كارت التطبيق
+struct AppCardView: View {
+    let route: SourceAppsView.SourceAppRoute
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // صورة التطبيق
+            AsyncImage(url: route.app.iconURL) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                } else if phase.error != nil {
+                    Image(systemName: "app.dashed")
+                        .resizable()
+                        .foregroundColor(.gray)
+                } else {
+                    ProgressView()
+                }
+            }
+            .frame(width: 75, height: 75)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            
+            // اسم التطبيق والإصدار
+            VStack(spacing: 4) {
+                Text(route.app.name)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .foregroundColor(.primary)
+                
+                Text("v\(route.app.version)")
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+                    .foregroundColor(.secondary)
+            }
+            
+            // زر التثبيت
+            Text("تثبيت")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(Color.accentColor) // يأخذ اللون الأساسي لمتجرك
+                .clipShape(Capsule())
+        }
+        .padding(12)
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
