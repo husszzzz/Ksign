@@ -32,6 +32,7 @@ struct FeatherApp: App {
 					.onOpenURL(perform: _handleURL)
 					.transition(.move(edge: .top).combined(with: .opacity))
 			}
+            .preferredColorScheme(.dark) // إجبار التطبيق على الوضع الليلي
 			.animation(.smooth, value: downloadManager.manualDownloads.description)
             .animation(.smooth, value: extractManager.extractItems.description)
 			.onReceive(accentColorManager.objectWillChange) { _ in
