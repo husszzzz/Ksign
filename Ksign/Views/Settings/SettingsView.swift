@@ -28,7 +28,7 @@ struct SettingsView: View {
     }
     
     // 🛠️ عدل الروابط الثلاثة أدناه بما يناسبك:
-	private let _donationsUrl = "رابط_التبرع_الخاص_بك"
+	private let _donationsUrl = "https://t.me/OM_G9"
 	private let _githubUrl = "رابط_الجيت_هاب_الخاص_بك"
     private let _discordUrl = "رابط_الديسكورد_الخاص_بك"
     
