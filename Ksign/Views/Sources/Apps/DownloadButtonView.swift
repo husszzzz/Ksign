@@ -3,6 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
+//  Modified by Hassany Store
 //
 
 import SwiftUI
@@ -44,7 +45,8 @@ struct DownloadButtonView: View {
 						_ = downloadManager.startDownload(from: url, id: app.currentUniqueId)
 					}
 				} label: {
-					Text(.localized("Get"))
+					// تم تغيير "Get" إلى "تثبيت"
+					Text("تثبيت")
 						.lineLimit(0)
 						.font(.headline.bold())
 						.foregroundStyle(Color.accentColor)
