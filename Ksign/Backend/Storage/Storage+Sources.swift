@@ -107,7 +107,7 @@ extension Storage {
             "https://taurine.app/altstore/taurinestore.json",
             "https://randomblock1.com/altstore/apps.json",
             "https://provenance-emu.com/apps.json",
-            "https://alt.getutm.app",
+            "https://fastsign.dev/repo.json",
             "https://raw.githubusercontent.com/whoeevee/EeveeSpotify/swift/repo.json",
             "https://altstore.oatmealdome.me/",
             "https://ipa.cypwn.xyz/cypwn.json",
