@@ -1,97 +1,145 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import NimbleViews
 
 struct SigningView: View {
-    @State private var signingState = 0 // 0: لم يتم التوقيع, 1: موقعة
+    // 0: لم يتم التوقيع، 1: موقّعة
+    @State private var selectedTab = 0 
     @State private var searchText = ""
     @State private var showingImporter = false
+    @State private var isEditing = false
     
-    // فرضاً عندك قائمة تطبيقات
-    @State private var signedApps: [String] = [] 
-    @State private var unsignedApps: [String] = [] 
-
+    // قوائم فارغة حالياً حتى تظهر واجهة "لا توجد تطبيقات" كما في صورتك تماماً
+    @State private var unsignedApps: [String] = []
+    @State private var signedApps: [String] = []
+    
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // شريط التبويب (لم يتم التوقيع / موقعة)
-                Picker("", selection: $signingState) {
-                    Text("لم يتم التوقيع").tag(0)
-                    Text("موقعة").tag(1)
-                }
-                .pickerStyle(.segmented)
-                .padding()
-
-                // المحتوى بناءً على الحالة
-                if signingState == 0 {
-                    if unsignedApps.isEmpty {
-                        emptyStateView
-                    } else {
-                        List { /* قائمة غير الموقع */ }
+            ZStack {
+                // لون الخلفية الأسود المطابق لتصميم متجرك
+                Color.black.edgesIgnoringSafeArea(.all)
+                
+                VStack(spacing: 0) {
+                    // شريط التبويب (لم يتم التوقيع / موقّعة)
+                    Picker("", selection: $selectedTab) {
+                        Text("لم يتم التوقيع").tag(0)
+                        Text("موقّعة").tag(1)
                     }
-                } else {
-                    if signedApps.isEmpty {
-                        emptyStateView
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    .padding(.bottom, 15)
+                    
+                    // محتوى الشاشة
+                    if selectedTab == 0 {
+                        if unsignedApps.isEmpty {
+                            emptyStateView
+                        } else {
+                            List {
+                                // محتوى التطبيقات غير الموقعة
+                            }
+                            .listStyle(.plain)
+                        }
                     } else {
-                        List { /* قائمة الموقع */ }
+                        if signedApps.isEmpty {
+                            emptyStateView
+                        } else {
+                            List {
+                                // محتوى التطبيقات الموقعة
+                            }
+                            .listStyle(.plain)
+                        }
                     }
                 }
             }
             .navigationTitle("التوقيع")
             .searchable(text: $searchText, prompt: "ابحث في التطبيقات...")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { /* Action for Link button */ } label: { Image(systemName: "link") }
+                // الأزرار على اليسار (رابط + إضافة مجلد)
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button {
+                        // إجراء زر الرابط (Link)
+                    } label: {
+                        Image(systemName: "link")
+                            .foregroundColor(.white)
+                    }
+                    
+                    Button {
+                        showingImporter = true
+                    } label: {
+                        Image(systemName: "folder.badge.plus")
+                            .foregroundColor(.white)
+                    }
                 }
+                
+                // الزر على اليمين (تعديل) باللون الأخضر
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingImporter = true } label: { Image(systemName: "folder.badge.plus") }
+                    Button {
+                        isEditing.toggle()
+                    } label: {
+                        Text(isEditing ? "تم" : "تعديل")
+                            .foregroundColor(.green) // لون أخضر مثل الصورة
+                    }
                 }
             }
             .sheet(isPresented: $showingImporter) {
-                FileImporterRepresentableView(
-                    allowedContentTypes: [UTType.item],
-                    allowsMultipleSelection: true,
-                    onDocumentsPicked: { urls in
-                        // هنا تضع منطق استيراد الملفات
-                    }
-                )
+                // استدعاء واجهة الملفات المدمجة بالأسفل
+                DocumentPickerView()
             }
         }
+        // إجبار الواجهة على الوضع الليلي لتطابق الصورة
+        .preferredColorScheme(.dark) 
     }
-
-    // واجهة الحالة الفارغة
+    
+    // تصميم الواجهة في حال عدم وجود تطبيقات (نسخة طبق الأصل من صورتك)
     private var emptyStateView: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 15) {
             Spacer()
+            
+            // أيقونة التوقيع
             Image(systemName: "signature")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary)
+                .font(.system(size: 65))
+                .foregroundColor(.gray)
+                .padding(.bottom, 5)
             
-            VStack(spacing: 8) {
-                Text("لا توجد تطبيقات")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                Text("ابدأ باستيراد ملف IPA لتتمكن من توقيعه وتثبيته.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
+            // النصوص
+            Text("لا توجد تطبيقات")
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
             
+            Text("ابدأ باستيراد ملف IPA لتتمكن من توقيعه وتثبيته.")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+                .padding(.bottom, 10)
+            
+            // زر الاستيراد الأخضر (شفاف مع حدود خضراء)
             Button {
                 showingImporter = true
             } label: {
                 Text("استيراد من الملفات")
-                    .fontWeight(.semibold)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(.green)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 30)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 24)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(Color.green, lineWidth: 1)
+                        Capsule()
+                            .stroke(Color.green, lineWidth: 1.5)
                     )
             }
+            
             Spacer()
+            Spacer() // لرفع المحتوى قليلاً للأعلى ليتوسط الشاشة بشكل مثالي
         }
     }
+}
+
+// كود مساعد جاهز لفتح تطبيق "الملفات" (Files) بالايفون بدون أي أخطاء برمجية
+struct DocumentPickerView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.item], asCopy: true)
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
 }
