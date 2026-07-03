@@ -1,145 +1,334 @@
 import SwiftUI
-import UniformTypeIdentifiers
+import PhotosUI
+import NimbleViews
 
+// MARK: - View
 struct SigningView: View {
-    // 0: لم يتم التوقيع، 1: موقّعة
-    @State private var selectedTab = 0 
-    @State private var searchText = ""
-    @State private var showingImporter = false
-    @State private var isEditing = false
+    @Environment(\.dismiss) var dismiss
+    @Namespace var _namespace
+
+    @StateObject private var _optionsManager = OptionsManager.shared
     
-    // قوائم فارغة حالياً حتى تظهر واجهة "لا توجد تطبيقات" كما في صورتك تماماً
-    @State private var unsignedApps: [String] = []
-    @State private var signedApps: [String] = []
+    @State private var _temporaryOptions: Options = OptionsManager.shared.options
+    @State private var _temporaryCertificate: Int
+    @State private var _isAltPickerPresenting = false
+    @State private var _isFilePickerPresenting = false
+    @State private var _isImagePickerPresenting = false
+    @State private var _isLogsPresenting = false
+    @State private var _isSigning = false
+    @State private var _selectedPhoto: PhotosPickerItem? = nil
+    @State var appIcon: UIImage?
     
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                // لون الخلفية الأسود المطابق لتصميم متجرك
-                Color.black.edgesIgnoringSafeArea(.all)
-                
-                VStack(spacing: 0) {
-                    // شريط التبويب (لم يتم التوقيع / موقّعة)
-                    Picker("", selection: $selectedTab) {
-                        Text("لم يتم التوقيع").tag(0)
-                        Text("موقّعة").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.bottom, 15)
-                    
-                    // محتوى الشاشة
-                    if selectedTab == 0 {
-                        if unsignedApps.isEmpty {
-                            emptyStateView
-                        } else {
-                            List {
-                                // محتوى التطبيقات غير الموقعة
-                            }
-                            .listStyle(.plain)
-                        }
-                    } else {
-                        if signedApps.isEmpty {
-                            emptyStateView
-                        } else {
-                            List {
-                                // محتوى التطبيقات الموقعة
-                            }
-                            .listStyle(.plain)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("التوقيع")
-            .searchable(text: $searchText, prompt: "ابحث في التطبيقات...")
-            .toolbar {
-                // الأزرار على اليسار (رابط + إضافة مجلد)
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    Button {
-                        // إجراء زر الرابط (Link)
-                    } label: {
-                        Image(systemName: "link")
-                            .foregroundColor(.white)
-                    }
-                    
-                    Button {
-                        showingImporter = true
-                    } label: {
-                        Image(systemName: "folder.badge.plus")
-                            .foregroundColor(.white)
-                    }
-                }
-                
-                // الزر على اليمين (تعديل) باللون الأخضر
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isEditing.toggle()
-                    } label: {
-                        Text(isEditing ? "تم" : "تعديل")
-                            .foregroundColor(.green) // لون أخضر مثل الصورة
-                    }
-                }
-            }
-            .sheet(isPresented: $showingImporter) {
-                // استدعاء واجهة الملفات المدمجة بالأسفل
-                DocumentPickerView()
-            }
-        }
-        // إجبار الواجهة على الوضع الليلي لتطابق الصورة
-        .preferredColorScheme(.dark) 
+    var signAndInstall: Bool = false
+    
+    // MARK: Fetch
+    @FetchRequest(
+        entity: CertificatePair.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \CertificatePair.date, ascending: false)],
+        animation: .snappy
+    ) private var certificates: FetchedResults<CertificatePair>
+    
+    private func _selectedCert() -> CertificatePair? {
+        guard certificates.indices.contains(_temporaryCertificate) else { return nil }
+        return certificates[_temporaryCertificate]
     }
     
-    // تصميم الواجهة في حال عدم وجود تطبيقات (نسخة طبق الأصل من صورتك)
-    private var emptyStateView: some View {
-        VStack(spacing: 15) {
-            Spacer()
-            
-            // أيقونة التوقيع
-            Image(systemName: "signature")
-                .font(.system(size: 65))
-                .foregroundColor(.gray)
-                .padding(.bottom, 5)
-            
-            // النصوص
-            Text("لا توجد تطبيقات")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-            
-            Text("ابدأ باستيراد ملف IPA لتتمكن من توقيعه وتثبيته.")
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-                .padding(.bottom, 10)
-            
-            // زر الاستيراد الأخضر (شفاف مع حدود خضراء)
-            Button {
-                showingImporter = true
-            } label: {
-                Text("استيراد من الملفات")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.green)
-                    .padding(.vertical, 10)
-                    .padding(.horizontal, 24)
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.green, lineWidth: 1.5)
-                    )
+    private func _getCertAppID() -> String? {
+        guard
+            let cert = _selectedCert(),
+            let decoded = Storage.shared.getProvisionFileDecoded(for: cert),
+            let entitlements = decoded.Entitlements,
+            let appID = entitlements["application-identifier"]?.value as? String
+        else {
+            return nil
+        }
+        return appID.split(separator: ".").dropFirst().joined(separator: ".")
+    }
+    
+    var app: AppInfoPresentable
+    
+    init(app: AppInfoPresentable, signAndInstall: Bool = false) {
+        self.app = app
+        self.signAndInstall = signAndInstall
+        let storedCert = UserDefaults.standard.integer(forKey: "feather.selectedCert")
+        __temporaryCertificate = State(initialValue: storedCert)
+    }
+        
+    // MARK: Body
+    var body: some View {
+        NBNavigationView(app.name ?? .localized("Unknown"), displayMode: .inline) {
+            Form {
+                _customizationOptions(for: app)
+                _cert()
+                _customizationProperties(for: app)
+            }
+            .disabled(_isSigning)
+            .safeAreaInset(edge: .bottom) {
+                if _isSigning {
+                    Button() {
+                        _isLogsPresenting = true
+                    } label: {
+                        NBSheetButton(title: .localized("Show Logs"))
+                    }
+                    .tint(.secondary)
+                    .compatMatchedTransitionSource(id: "showLogs", ns: _namespace)
+                } else {
+                    Button() {
+                        _start()
+                    } label: {
+                        NBSheetButton(title: .localized("Start Signing"))
+                    }
+                }
+            }
+            .toolbar {
+                NBToolbarButton(role: .dismiss)
+                
+                NBToolbarButton(
+                    .localized("Reset"),
+                    style: .text,
+                    placement: .topBarTrailing
+                ) {
+                    _temporaryOptions = OptionsManager.shared.options
+                    appIcon = nil
+                }
+            }
+            .sheet(isPresented: $_isAltPickerPresenting) { SigningAlternativeIconView(app: app, appIcon: $appIcon, isModifing: .constant(true)) }
+            .sheet(isPresented: $_isFilePickerPresenting) {
+                FileImporterRepresentableView(
+                    allowedContentTypes:  [.image],
+                    onDocumentsPicked: { urls in
+                        guard let selectedFileURL = urls.first else { return }
+                        self.appIcon = UIImage.fromFile(selectedFileURL)?.resizeToSquare()
+                    }
+                )
+            }
+            .photosPicker(isPresented: $_isImagePickerPresenting, selection: $_selectedPhoto)
+            .fullScreenCover(isPresented: $_isLogsPresenting ) {
+                LogsView(manager: LogsManager.shared)
+                    .compatNavigationTransition(id: "showLogs", ns: _namespace)
+            }
+            .onChange(of: _selectedPhoto) { newValue in
+                guard let newValue else { return }
+                
+                Task {
+                    if let data = try? await newValue.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data)?.resizeToSquare() {
+                        appIcon = image
+                    }
+                }
+            }
+            .animation(.smooth, value: _isSigning)
+        }
+        .onAppear {
+            // ppq protection
+            if
+                _optionsManager.options.ppqProtection,
+                let identifier = app.identifier,
+                let cert = _selectedCert(),
+                cert.ppQCheck
+            {
+                _temporaryOptions.appIdentifier = "\(identifier).\(_optionsManager.options.ppqString)"
             }
             
-            Spacer()
-            Spacer() // لرفع المحتوى قليلاً للأعلى ليتوسط الشاشة بشكل مثالي
+            if
+                let currentBundleId = app.identifier,
+                let newBundleId = _temporaryOptions.identifiers[currentBundleId]
+            {
+                _temporaryOptions.appIdentifier = newBundleId
+            }
+            
+            if
+                let currentName = app.name,
+                let newName = _temporaryOptions.displayNames[currentName]
+            {
+                _temporaryOptions.appName = newName
+            }
+            
+            if _optionsManager.options.prefix != nil || _optionsManager.options.suffix != nil {
+                var name = app.name ?? ""
+                
+                if
+                    let dictName = _temporaryOptions.displayNames[name]
+                {
+                    name = dictName
+                }
+                
+                if let prefix = _optionsManager.options.prefix {
+                    name = prefix + name
+                }
+                
+                if let suffix = _optionsManager.options.suffix {
+                    name = name + suffix
+                }
+                
+                _temporaryOptions.appName = name
+            }
         }
     }
 }
 
-// كود مساعد جاهز لفتح تطبيق "الملفات" (Files) بالايفون بدون أي أخطاء برمجية
-struct DocumentPickerView: UIViewControllerRepresentable {
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.item], asCopy: true)
-        return picker
+// MARK: - Extension: View
+extension SigningView {
+    @ViewBuilder
+    private func _customizationOptions(for app: AppInfoPresentable) -> some View {
+        NBSection(.localized("Customization")) {
+            Menu {
+                Button(.localized("Select Alternative Icon")) { _isAltPickerPresenting = true }
+                Button(.localized("Choose from Files")) { _isFilePickerPresenting = true }
+                Button(.localized("Choose from Photos")) { _isImagePickerPresenting = true }
+            } label: {
+                if let icon = appIcon {
+                    Image(uiImage: icon)
+                        .appIconStyle(size: 55)
+                } else {
+                    FRAppIconView(app: app, size: 55)
+                }
+            }
+            
+            _infoCell(.localized("Name"), desc: _temporaryOptions.appName ?? app.name) {
+                SigningPropertiesView(
+                    title: .localized("Name"),
+                    initialValue: _temporaryOptions.appName ?? (app.name ?? ""),
+                    bindingValue: $_temporaryOptions.appName
+                )
+            }
+            _infoCell(.localized("Identifier"), desc: _temporaryOptions.appIdentifier ?? app.identifier) {
+                SigningPropertiesView(
+                    title: .localized("Identifier"),
+                    initialValue: _temporaryOptions.appIdentifier ?? (app.identifier ?? ""),
+                    certAppId: _getCertAppID(),
+                    bindingValue: $_temporaryOptions.appIdentifier
+                )
+            }
+            _infoCell(.localized("Version"), desc: _temporaryOptions.appVersion ?? app.version) {
+                SigningPropertiesView(
+                    title: .localized("Version"),
+                    initialValue: _temporaryOptions.appVersion ?? (app.version ?? ""),
+                    bindingValue: $_temporaryOptions.appVersion
+                )
+            }
+        }
     }
     
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
+    @ViewBuilder
+    private func _cert() -> some View {
+        NBSection(.localized("Signing")) {
+            if let cert = _selectedCert() {
+                NavigationLink {
+                    CertificatesView(selectedCert: $_temporaryCertificate)
+                } label: {
+                    CertificatesCellView(
+                        cert: cert
+                    )
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func _customizationProperties(for app: AppInfoPresentable) -> some View {
+        NBSection(.localized("Advanced")) {
+            DisclosureGroup(.localized("Modify")) {
+                NavigationLink(.localized("Existing Dylibs")) {
+                    SigningDylibView(
+                        app: app,
+                        options: $_temporaryOptions.optional()
+                    )
+                }
+                
+                NavigationLink(String.localized("Frameworks & PlugIns")) {
+                    SigningFrameworksView(
+                        app: app,
+                        options: $_temporaryOptions.optional()
+                    )
+                }
+                #if NIGHTLY || DEBUG
+                NavigationLink(String.localized("Entitlements")) {
+                    SigningEntitlementsView(
+                        bindingValue: $_temporaryOptions.appEntitlementsFile
+                    )
+                }
+                #endif
+                NavigationLink(String.localized("Tweaks")) {
+                    SigningTweaksView(
+                        options: $_temporaryOptions
+                    )
+                }
+            }
+            
+            NavigationLink(String.localized("Properties")) {
+                Form { SigningOptionsView(
+                    options: $_temporaryOptions,
+                    temporaryOptions: _optionsManager.options
+                )}
+                .navigationTitle(.localized("Properties"))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func _infoCell<V: View>(_ title: String, desc: String?, @ViewBuilder destination: () -> V) -> some View {
+        NavigationLink {
+            destination()
+        } label: {
+            LabeledContent(title) {
+                Text(desc ?? .localized("Unknown"))
+            }
+        }
+    }
+}
+
+// MARK: - Extension: View (import)
+extension SigningView {
+    private func _start() {
+        guard _selectedCert() != nil || _temporaryOptions.doAdhocSigning || _temporaryOptions.onlyModify else {
+            UIAlertController.showAlertWithOk(
+                title: .localized("No Certificate"),
+                message: .localized("Please go to settings and import a valid certificate"),
+                isCancel: true
+            )
+            return
+        }
+
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+        _isLogsPresenting = _optionsManager.options.signingLogs
+        _isSigning = true
+#if DEBUG
+        LogsManager.shared.startCapture()
+#endif
+        FR.signPackageFile(
+            app,
+            using: _temporaryOptions,
+            icon: appIcon,
+            certificate: _selectedCert()
+        ) { [self] error in
+            if let error {
+                let ok = UIAlertAction(title: .localized("Dismiss"), style: .cancel) { _ in
+                    dismiss()
+                }
+                
+                UIAlertController.showAlert(
+                    title: .localized("Signing"),
+                    message: error.localizedDescription,
+                    actions: [ok]
+                )
+            } else {
+                // Remove app after signed option thing
+                if _temporaryOptions.removeApp && !app.isSigned {
+                    Storage.shared.deleteApp(for: app)
+                }
+                
+                if signAndInstall {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("feather.installApp"),
+                            object: nil
+                        )
+                    }
+                }
+                dismiss()
+            }
+        }
+    }
 }
