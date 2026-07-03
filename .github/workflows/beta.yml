@@ -8,8 +8,7 @@ on:
 jobs:
   build:
     name: Build Beta
-    # ملاحظة: إذا فشل الـ Build بسبب اسم الماك، استخدم macos-14 أو macos-15
-    runs-on: macos-15 
+    runs-on: macos-26
 
     steps:
       - name: Checkout Code
@@ -18,12 +17,6 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
-      - name: Clean and Prepare
-        run: |
-          echo "Cleaning up build artifacts..."
-          rm -rf SourcePackages
-          rm -rf ~/Library/Developer/Xcode/DerivedData/*
-          
       - name: Build
         run: |
           make
