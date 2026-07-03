@@ -1,287 +1,341 @@
 //
-//  ContentView.swift
+//  SigningView.swift
 //  Feather
 //
-//  Created by samara on 10.04.2025.
+//  Created by samara on 14.04.2025.
 //
 
 import SwiftUI
-import CoreData
+import PhotosUI
 import NimbleViews
 
 // MARK: - View
-struct LibraryView: View {
-	@StateObject var downloadManager = DownloadManager.shared
-	
-	@State private var _selectedInfoAppPresenting: AnyApp?
-	@State private var _selectedSigningAppPresenting: AnyApp?
-	@State private var _selectedInstallAppPresenting: AnyApp?
-	@State private var _selectedAppDylibsPresenting: AnyApp?
-	@State private var _isBulkSigningPresenting = false
-    @State private var _isBulkInstallingPresenting = false
-	@State private var _isImportingPresenting = false
-	@State private var _isDownloadingPresenting = false
+struct SigningView: View {
+	@Environment(\.dismiss) var dismiss
+	@Namespace var _namespace
 
-	@State private var _alertDownloadString: String = "" // for _isDownloadingPresenting
-	@State private var _searchText = ""
-	@State private var _selectedTab: Int = 0 // 0 for Downloaded, 1 for Signed
+	@StateObject private var _optionsManager = OptionsManager.shared
 	
-	// MARK: Edit Mode
-    @State private var _isEditMode: EditMode = .inactive
-	@State private var _selectedApps: Set<String> = []
+	@State private var _temporaryOptions: Options = OptionsManager.shared.options
+	@State private var _temporaryCertificate: Int
+	@State private var _isAltPickerPresenting = false
+	@State private var _isFilePickerPresenting = false
+	@State private var _isImagePickerPresenting = false
+	@State private var _isLogsPresenting = false
+	@State private var _isSigning = false
+	@State private var _selectedPhoto: PhotosPickerItem? = nil
+	@State var appIcon: UIImage?
 	
-	@Namespace private var _namespace
-	
-	// horror
-	private func filteredAndSortedApps<T>(from apps: FetchedResults<T>) -> [T] where T: NSManagedObject {
-		apps.filter {
-			_searchText.isEmpty ||
-			(($0.value(forKey: "name") as? String)?.localizedCaseInsensitiveContains(_searchText) ?? false)
-		}
-	}
-	
-	private var _filteredSignedApps: [Signed] {
-		filteredAndSortedApps(from: _signedApps)
-	}
-	
-	private var _filteredImportedApps: [Imported] {
-		filteredAndSortedApps(from: _importedApps)
-	}
+	var signAndInstall: Bool = false
 	
 	// MARK: Fetch
 	@FetchRequest(
-		entity: Signed.entity(),
-		sortDescriptors: [NSSortDescriptor(keyPath: \Signed.date, ascending: false)],
+		entity: CertificatePair.entity(),
+		sortDescriptors: [NSSortDescriptor(keyPath: \CertificatePair.date, ascending: false)],
 		animation: .snappy
-	) private var _signedApps: FetchedResults<Signed>
+	) private var certificates: FetchedResults<CertificatePair>
 	
-	@FetchRequest(
-		entity: Imported.entity(),
-		sortDescriptors: [NSSortDescriptor(keyPath: \Imported.date, ascending: false)],
-		animation: .snappy
-	) private var _importedApps: FetchedResults<Imported>
+	private func _selectedCert() -> CertificatePair? {
+		guard certificates.indices.contains(_temporaryCertificate) else { return nil }
+		return certificates[_temporaryCertificate]
+	}
 	
+	private func _getCertAppID() -> String? {
+		guard
+			let cert = _selectedCert(),
+			let decoded = Storage.shared.getProvisionFileDecoded(for: cert),
+			let entitlements = decoded.Entitlements,
+			let appID = entitlements["application-identifier"]?.value as? String
+		else {
+			return nil
+		}
+		return appID.split(separator: ".").dropFirst().joined(separator: ".")
+	}
+	
+	var app: AppInfoPresentable
+	
+	init(app: AppInfoPresentable, signAndInstall: Bool = false) {
+		self.app = app
+		self.signAndInstall = signAndInstall
+		let storedCert = UserDefaults.standard.integer(forKey: "feather.selectedCert")
+		__temporaryCertificate = State(initialValue: storedCert)
+	}
+		
 	// MARK: Body
     var body: some View {
-		NBNavigationView(.localized("Library")) {
-			VStack(spacing: 0) {
-				Picker("", selection: $_selectedTab) {
-					Text(.localized("Downloaded Apps")).tag(0)
-					Text(.localized("Signed Apps")).tag(1)
-				}
-				.pickerStyle(SegmentedPickerStyle())
-				.padding(.horizontal)
-				.padding(.vertical, 8)
-				
-				NBListAdaptable {
-					if _selectedTab == 0 {
-						NBSection(
-							.localized("Downloaded Apps"),
-							secondary: _filteredImportedApps.count.description
-						) {
-							ForEach(_filteredImportedApps, id: \.uuid) { app in
-								LibraryCellView(
-									app: app,
-									selectedInfoAppPresenting: $_selectedInfoAppPresenting,
-									selectedSigningAppPresenting: $_selectedSigningAppPresenting,
-									selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-									selectedAppDylibsPresenting: $_selectedAppDylibsPresenting,
-									selectedApps: $_selectedApps
-								)
-								.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
-							}
-						}
-					} else {
-						NBSection(
-							.localized("Signed Apps"),
-							secondary: _filteredSignedApps.count.description
-						) {
-							ForEach(_filteredSignedApps, id: \.uuid) { app in
-								LibraryCellView(
-									app: app,
-									selectedInfoAppPresenting: $_selectedInfoAppPresenting,
-									selectedSigningAppPresenting: $_selectedSigningAppPresenting,
-									selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-									selectedAppDylibsPresenting: $_selectedAppDylibsPresenting,
-									selectedApps: $_selectedApps
-								)
-								.compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
-							}
-						}
-					}
-				}
+		NBNavigationView(app.name ?? .localized("Unknown"), displayMode: .inline) {
+			Form {
+				_customizationOptions(for: app)
+				_cert()
+				_customizationProperties(for: app)
 			}
-			.searchable(text: $_searchText, placement: .platform())
-            .overlay {
-                if
-                    _filteredSignedApps.isEmpty,
-                    _filteredImportedApps.isEmpty
-                {
-                    if #available(iOS 17, *) {
-                        ContentUnavailableView {
-                            Label(.localized("No Apps"), systemImage: "questionmark.app.fill")
-                        } description: {
-                            Text(.localized("Get started by importing your first IPA file."))
-                        } actions: {
-                            Menu {
-                                _importActions()
-                            } label: {
-                                Text("Import").bg()
-                            }
-                        }
-                    }
-                }
-            }
-			.toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
-                if _isEditMode.isEditing {
-					ToolbarItemGroup(placement: .topBarTrailing) {
-                        if _selectedTab == 0 {
-                            Button {
-                                _isBulkSigningPresenting = true
-                            } label: {
-                                NBButton(.localized("Sign"), systemImage: "signature", style: .icon)
-                            }
-                            .disabled(_selectedApps.isEmpty)
-                        } else {
-                            Button {
-                                _isBulkInstallingPresenting = true
-                            } label: {
-                                NBButton(.localized("Install"), systemImage: "square.and.arrow.down")
-                            }
-                            .disabled(_selectedApps.isEmpty)
-                        }
-						Button {
-							_bulkDeleteSelectedApps()
-						} label: {
-							NBButton(.localized("Delete"), systemImage: "trash", style: .icon)
-						}
-						.disabled(_selectedApps.isEmpty)
+			.disabled(_isSigning)
+			.safeAreaInset(edge: .bottom) {
+				if _isSigning {
+					Button() {
+						_isLogsPresenting = true
+					} label: {
+						NBSheetButton(title: .localized("Show Logs"))
 					}
+					.tint(.secondary)
+					.compatMatchedTransitionSource(id: "showLogs", ns: _namespace)
 				} else {
-					NBToolbarMenu(
-						systemImage: "plus",
-						style: .icon,
-						placement: .topBarTrailing
-					) {
-                        _importActions()
-                    }
+					Button() {
+						_start()
+					} label: {
+						NBSheetButton(title: .localized("Start Signing"))
+					}
 				}
 			}
-            .environment(\.editMode, $_isEditMode)
-			.sheet(item: $_selectedInfoAppPresenting) { app in
-				LibraryInfoView(app: app.base)
-			}
-			.sheet(item: $_selectedInstallAppPresenting) { app in
-				InstallPreviewView(app: app.base, isSharing: app.archive)
-					.presentationDetents([.height(200)])
-					.presentationDragIndicator(.visible)			}
-			.fullScreenCover(item: $_selectedSigningAppPresenting) { app in
-				SigningView(app: app.base, signAndInstall: app.signAndInstall)
-					.compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace)
-			}
-			.fullScreenCover(item: $_selectedAppDylibsPresenting) { app in
-                DylibsView(app: app.base)
-					.compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace)
-			}
-			.fullScreenCover(isPresented: $_isBulkSigningPresenting) {
-				BulkSigningView(apps: _selectedApps.compactMap { id in
-					(_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-					?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-				})
-				.compatNavigationTransition(id: _selectedApps.joined(separator: ","), ns: _namespace)
-				.onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ksign.bulkSigningFinished"))) { notification in
-					_selectedTab = 1
+			.toolbar {
+				NBToolbarButton(role: .dismiss)
+				
+				NBToolbarButton(
+					.localized("Reset"),
+					style: .text,
+					placement: .topBarTrailing
+				) {
+					_temporaryOptions = OptionsManager.shared.options
+					appIcon = nil
 				}
 			}
-            .sheet(isPresented: $_isBulkInstallingPresenting) {
-                BulkInstallPreviewView(apps: _selectedApps.compactMap { id in
-                    (_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                    ?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                })
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-            }
-			.sheet(isPresented: $_isImportingPresenting) {
+			.sheet(isPresented: $_isAltPickerPresenting) { SigningAlternativeIconView(app: app, appIcon: $appIcon, isModifing: .constant(true)) }
+			.sheet(isPresented: $_isFilePickerPresenting) {
 				FileImporterRepresentableView(
-					allowedContentTypes:  [.ipa, .tipa],
-					allowsMultipleSelection: true,
+					allowedContentTypes:  [.image],
 					onDocumentsPicked: { urls in
-						guard !urls.isEmpty else { return }
-						
-						for ipas in urls {
-							let id = "FeatherManualDownload_\(UUID().uuidString)"
-							let dl = downloadManager.startArchive(from: ipas, id: id)
-							downloadManager.handlePachageFile(url: ipas, dl: dl) { err in
-								if let error = err {
-									UIAlertController.showAlertWithOk(title: "Error", message: .localized("Whoops!, something went wrong when extracting the file. \nMaybe try switching the extraction library in the settings?"))
-								}
-							}
-						}
+						guard let selectedFileURL = urls.first else { return }
+						self.appIcon = UIImage.fromFile(selectedFileURL)?.resizeToSquare()
 					}
 				)
 			}
-			.alert(.localized("Import from URL"), isPresented: $_isDownloadingPresenting) {
-				TextField(.localized("URL"), text: $_alertDownloadString)
-				Button(.localized("Cancel"), role: .cancel) {
-					_alertDownloadString = ""
-				}
-				Button(.localized("OK")) {
-					if let url = URL(string: _alertDownloadString) {
-						_ = downloadManager.startDownload(from: url, id: "FeatherManualDownload_\(UUID().uuidString)")
+			.photosPicker(isPresented: $_isImagePickerPresenting, selection: $_selectedPhoto)
+			.fullScreenCover(isPresented: $_isLogsPresenting ) {
+				LogsView(manager: LogsManager.shared)
+					.compatNavigationTransition(id: "showLogs", ns: _namespace)
+			}
+			.onChange(of: _selectedPhoto) { newValue in
+				guard let newValue else { return }
+				
+				Task {
+					if let data = try? await newValue.loadTransferable(type: Data.self),
+					   let image = UIImage(data: data)?.resizeToSquare() {
+						appIcon = image
 					}
 				}
 			}
-			.onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("feather.installApp"))) { notification in
-                if let app = _signedApps.first {
-                    _selectedInstallAppPresenting = AnyApp(base: app)
+			.animation(.smooth, value: _isSigning)
+		}
+		.onAppear {
+			// ppq protection
+			if
+				_optionsManager.options.ppqProtection,
+				let identifier = app.identifier,
+				let cert = _selectedCert(),
+				cert.ppQCheck
+			{
+				_temporaryOptions.appIdentifier = "\(identifier).\(_optionsManager.options.ppqString)"
+			}
+			
+			if
+				let currentBundleId = app.identifier,
+				let newBundleId = _temporaryOptions.identifiers[currentBundleId]
+			{
+				_temporaryOptions.appIdentifier = newBundleId
+			}
+			
+			if
+				let currentName = app.name,
+				let newName = _temporaryOptions.displayNames[currentName]
+			{
+				_temporaryOptions.appName = newName
+			}
+			
+			if _optionsManager.options.prefix != nil || _optionsManager.options.suffix != nil {
+				var name = app.name ?? ""
+				
+				if
+					let dictName = _temporaryOptions.displayNames[name]
+				{
+					name = dictName
+				}
+				
+				if let prefix = _optionsManager.options.prefix {
+					name = prefix + name
+				}
+				
+				if let suffix = _optionsManager.options.suffix {
+					name = name + suffix
+				}
+				
+				_temporaryOptions.appName = name
+			}
+		}
+    }
+}
+
+// MARK: - Extension: View
+extension SigningView {
+	@ViewBuilder
+	private func _customizationOptions(for app: AppInfoPresentable) -> some View {
+		NBSection(.localized("Customization")) {
+			Menu {
+				Button(.localized("Select Alternative Icon")) { _isAltPickerPresenting = true }
+				Button(.localized("Choose from Files")) { _isFilePickerPresenting = true }
+				Button(.localized("Choose from Photos")) { _isImagePickerPresenting = true }
+			} label: {
+				if let icon = appIcon {
+					Image(uiImage: icon)
+						.appIconStyle(size: 55)
+				} else {
+					FRAppIconView(app: app, size: 55)
 				}
 			}
-        }
-        .onChange(of: _isEditMode) { state in
-            if !state.isEditing {
-                DispatchQueue.main.asyncAfter(deadline: .now()) {
-                    withAnimation{
-                        _selectedApps.removeAll()
-                    }
-                }
-            }
-        }
-    }
-}
-
-extension LibraryView {
-    @ViewBuilder
-    private func _importActions() -> some View {
-        Button(.localized("Import from Files"), systemImage: "folder") {
-            _isImportingPresenting = true
-        }
-        Button(.localized("Import from URL"), systemImage: "globe") {
-            _isDownloadingPresenting = true
-        }
-    }
-}
-
-
-// MARK: - Extension: View (Edit Mode Functions)
-extension LibraryView {
-	private func _bulkDeleteSelectedApps() {
-		let appsToDelete = _selectedApps
-		
-		withAnimation(.easeInOut(duration: 0.5)) {
-			for appUUID in appsToDelete {
-				if let signedApp = _signedApps.first(where: { $0.uuid == appUUID }) {
-					Storage.shared.deleteApp(for: signedApp)
-				} else if let importedApp = _importedApps.first(where: { $0.uuid == appUUID }) {
-					Storage.shared.deleteApp(for: importedApp)
+			
+			_infoCell(.localized("Name"), desc: _temporaryOptions.appName ?? app.name) {
+				SigningPropertiesView(
+					title: .localized("Name"),
+					initialValue: _temporaryOptions.appName ?? (app.name ?? ""),
+					bindingValue: $_temporaryOptions.appName
+				)
+			}
+			_infoCell(.localized("Identifier"), desc: _temporaryOptions.appIdentifier ?? app.identifier) {
+				SigningPropertiesView(
+					title: .localized("Identifier"),
+					initialValue: _temporaryOptions.appIdentifier ?? (app.identifier ?? ""),
+					certAppId: _getCertAppID(),
+					bindingValue: $_temporaryOptions.appIdentifier
+				)
+			}
+			_infoCell(.localized("Version"), desc: _temporaryOptions.appVersion ?? app.version) {
+				SigningPropertiesView(
+					title: .localized("Version"),
+					initialValue: _temporaryOptions.appVersion ?? (app.version ?? ""),
+					bindingValue: $_temporaryOptions.appVersion
+				)
+			}
+		}
+	}
+	
+	@ViewBuilder
+	private func _cert() -> some View {
+		NBSection(.localized("Signing")) {
+			if let cert = _selectedCert() {
+				NavigationLink {
+					CertificatesView(selectedCert: $_temporaryCertificate)
+				} label: {
+					CertificatesCellView(
+						cert: cert
+					)
 				}
 			}
 		}
-		
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-			_selectedApps.removeAll()
+	}
+	
+	@ViewBuilder
+	private func _customizationProperties(for app: AppInfoPresentable) -> some View {
+		NBSection(.localized("Advanced")) {
+			DisclosureGroup(.localized("Modify")) {
+				NavigationLink(.localized("Existing Dylibs")) {
+					SigningDylibView(
+						app: app,
+						options: $_temporaryOptions.optional()
+					)
+				}
+				
+				NavigationLink(String.localized("Frameworks & PlugIns")) {
+					SigningFrameworksView(
+						app: app,
+						options: $_temporaryOptions.optional()
+					)
+				}
+				#if NIGHTLY || DEBUG
+				NavigationLink(String.localized("Entitlements")) {
+					SigningEntitlementsView(
+						bindingValue: $_temporaryOptions.appEntitlementsFile
+					)
+				}
+				#endif
+				NavigationLink(String.localized("Tweaks")) {
+					SigningTweaksView(
+						options: $_temporaryOptions
+					)
+				}
+			}
+			
+			NavigationLink(String.localized("Properties")) {
+				Form { SigningOptionsView(
+					options: $_temporaryOptions,
+					temporaryOptions: _optionsManager.options
+				)}
+				.navigationTitle(.localized("Properties"))
+			}
+		}
+	}
+	
+	@ViewBuilder
+	private func _infoCell<V: View>(_ title: String, desc: String?, @ViewBuilder destination: () -> V) -> some View {
+		NavigationLink {
+			destination()
+		} label: {
+			LabeledContent(title) {
+				Text(desc ?? .localized("Unknown"))
+			}
+		}
+	}
+}
+
+// MARK: - Extension: View (import)
+extension SigningView {
+	private func _start() {
+		guard _selectedCert() != nil || _temporaryOptions.doAdhocSigning || _temporaryOptions.onlyModify else {
+			UIAlertController.showAlertWithOk(
+				title: .localized("No Certificate"),
+				message: .localized("Please go to settings and import a valid certificate"),
+				isCancel: true
+			)
+			return
+		}
+
+		let generator = UIImpactFeedbackGenerator(style: .light)
+		generator.impactOccurred()
+		_isLogsPresenting = _optionsManager.options.signingLogs
+		_isSigning = true
+#if DEBUG
+		LogsManager.shared.startCapture()
+#endif
+		FR.signPackageFile(
+			app,
+			using: _temporaryOptions,
+			icon: appIcon,
+			certificate: _selectedCert()
+		) { [self] error in
+			if let error {
+				let ok = UIAlertAction(title: .localized("Dismiss"), style: .cancel) { _ in
+					dismiss()
+				}
+				
+				UIAlertController.showAlert(
+					title: .localized("Signing"),
+					message: error.localizedDescription,
+					actions: [ok]
+				)
+			} else {
+				// Remove app after signed option thing
+				if _temporaryOptions.removeApp && !app.isSigned {
+					Storage.shared.deleteApp(for: app)
+				}
+                
+				if signAndInstall {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("feather.installApp"),
+                            object: nil
+                        )
+                    }
+                }
+				dismiss()
+			}
 		}
 	}
 }
