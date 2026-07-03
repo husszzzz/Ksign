@@ -3,6 +3,7 @@
 //  Ksign
 //
 //  Created by Nagata Asami on 5/22/25.
+//  Modified for Hassany Store - Green Sign & Install Action
 //
 
 import SwiftUI
@@ -164,6 +165,22 @@ struct FileRow: View {
     
     @ViewBuilder
     private func fileConfirmationDialogButtons() -> some View {
+        // 🟢 إضافة خيار "توقيع وتثبيت" باللون الأخضر في البداية لملفات الـ IPA
+        if let ext = file.fileExtension?.lowercased(), ext == "ipa" {
+            Button {
+                // استدعاء أمر استيراد الـ IPA لبدء التوقيع
+                onImportIpa(file)
+                // إرسال إشعار للنظام للانتقال المباشر لقسم التطبيقات الموقعة (موقع)
+                NotificationCenter.default.post(name: NSNotification.Name("ksign.bulkSigningFinished"), object: nil)
+            } label: {
+                HStack {
+                    Text("توقيع وتثبيت")
+                    Image(systemName: "signature")
+                }
+            }
+            .tint(.green) // تلوين الزر بالأخضر في الـ Confirmation Dialog / Context Menu
+        }
+
         if !file.isDirectory {
             Button {
                 quickLookFileURL = file.url
@@ -212,14 +229,7 @@ struct FileRow: View {
             }
         }
         
-        if let ext = file.fileExtension?.lowercased(), ext == "ipa" {
-            Button {
-                onImportIpa(file)
-            } label: {
-                Text(String(localized: "Import to Library"))
-                Image(systemName: "square.grid.2x2.fill")
-            }
-        }
+        // تم حذف خيار "استيراد إلى المكتبة" القديم من هنا نهائياً لعدم التكرار
         
         if let ext = file.fileExtension?.lowercased(), ext == "app" {
             Button {
