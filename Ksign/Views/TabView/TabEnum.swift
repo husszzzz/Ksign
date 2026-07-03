@@ -53,7 +53,7 @@ enum TabEnum: String, CaseIterable, Hashable {
         case .settings: SettingsView()
         case .certificates: NBNavigationView(.localized("Certificates")) { CertificatesView() }
         case .appstore: AppstoreView()
-        case .signing: SigningMainView() // سيتم ربطها بالواجهة الجديدة المدمجة
+        case .signing: SigningMainView() // مربوطة بالواجهة الجديدة المدمجة
         }
     }
     
@@ -73,25 +73,34 @@ enum TabEnum: String, CaseIterable, Hashable {
     }
 }
 
-// MARK: - واجهة التوقيع (مؤقتة للخطوة الأولى حتى ينجح الـ Build)
-// بالخطوة الثانية راح نعدل هذا الكود ونسوي بيه الأزرار اللي فوق (الملفات - موقع)
+// MARK: - واجهة التوقيع المدمجة (الخطوة الثانية)
 struct SigningMainView: View {
+    // حالة المتغير لمعرفة أي قسم مختار (0 = الملفات، 1 = موقع)
+    @State private var selectedTab = 0
+    
     var body: some View {
-        NBNavigationView("التوقيع") {
-            VStack(spacing: 20) {
-                Image(systemName: "signature")
-                    .font(.system(size: 60))
-                    .foregroundColor(.accentColor)
-                
-                Text("هنا ستكون واجهة التوقيع")
-                    .font(.title2.bold())
-                
-                Text("جاري الانتقال للخطوة الثانية لبرمجة الأزرار (الملفات - موقع)...")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding()
+        VStack(spacing: 0) {
+            // شريط التبديل (Segmented Control) اللي يصير فوق
+            VStack {
+                Picker("القسم", selection: $selectedTab) {
+                    Text("الملفات").tag(0)
+                    Text("موقع").tag(1)
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 10)
+            }
+            .background(Color(UIColor.systemGroupedBackground))
+            .zIndex(1)
+            
+            // عرض الواجهات بناءً على الاختيار (بدون تأثير سحب حتى لا يتعارض مع حذف الملفات)
+            if selectedTab == 0 {
+                FilesView() // واجهة استيراد الملفات
+            } else {
+                LibraryView() // واجهة التطبيقات الموقعة
             }
         }
+        .background(Color(UIColor.systemGroupedBackground).ignoresSafeArea())
     }
 }
