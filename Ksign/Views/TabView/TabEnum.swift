@@ -10,6 +10,7 @@ import SwiftUI
 import NimbleViews
 
 enum TabEnum: String, CaseIterable, Hashable {
+    case signing
     case files
     case sources
     case library
@@ -26,7 +27,8 @@ enum TabEnum: String, CaseIterable, Hashable {
         case .library:      return .localized("Library")
         case .settings:     return .localized("Settings")
         case .certificates: return .localized("Certificates")
-        case .appstore:     return .localized("App Store")
+        case .appstore:     return "متجر التطبيقات" // التعديل الأول: تغيير الاسم
+        case .signing:      return "التوقيع"        // التعديل الثاني: إضافة التوقيع
         }
     }
     
@@ -38,6 +40,7 @@ enum TabEnum: String, CaseIterable, Hashable {
         case .settings:     return "gearshape.2"
         case .certificates: return "person.text.rectangle"
         case .appstore:     return "plus.app.fill"
+        case .signing:      return "signature" // أيقونة التوقيع الجديدة
         }
     }
     
@@ -50,16 +53,16 @@ enum TabEnum: String, CaseIterable, Hashable {
         case .settings: SettingsView()
         case .certificates: NBNavigationView(.localized("Certificates")) { CertificatesView() }
         case .appstore: AppstoreView()
+        case .signing: SigningMainView() // سيتم ربطها بالواجهة الجديدة المدمجة
         }
     }
     
-    // هذا الجزء هو اللي يتحكم بالترتيب وأول قسم يفتح بالتطبيق
+    // هذا الجزء هو اللي يتحكم بالترتيب والأقسام المعروضة بالشريط السفلي
     static var defaultTabs: [TabEnum] {
         return [
-            .appstore,  // 1. App Store (يفتح المتجر عليه مباشرة)
-            .files,     // 2. الملفات
-            .library,   // 3. المكتبة
-            .settings   // 4. الإعدادات
+            .appstore,  // 1. متجر التطبيقات (يفتح المتجر عليه مباشرة)
+            .signing,   // 2. التوقيع (القسم الجديد اللي راح يدمج الملفات والموقع)
+            .settings   // 3. الإعدادات
         ]
     }
     
@@ -67,5 +70,28 @@ enum TabEnum: String, CaseIterable, Hashable {
         return [
             .certificates
         ]
+    }
+}
+
+// MARK: - واجهة التوقيع (مؤقتة للخطوة الأولى حتى ينجح الـ Build)
+// بالخطوة الثانية راح نعدل هذا الكود ونسوي بيه الأزرار اللي فوق (الملفات - موقع)
+struct SigningMainView: View {
+    var body: some View {
+        NBNavigationView("التوقيع") {
+            VStack(spacing: 20) {
+                Image(systemName: "signature")
+                    .font(.system(size: 60))
+                    .foregroundColor(.accentColor)
+                
+                Text("هنا ستكون واجهة التوقيع")
+                    .font(.title2.bold())
+                
+                Text("جاري الانتقال للخطوة الثانية لبرمجة الأزرار (الملفات - موقع)...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            }
+        }
     }
 }
