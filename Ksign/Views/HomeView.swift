@@ -13,16 +13,151 @@ struct VIPPackage: Identifiable {
     let colors: [Color]
 }
 
+struct StoreSettings: Codable {
+    let banners: [String]
+}
+
+// MARK: - محرك جلب البنرات من السورس القياسي
+class BannerManager: ObservableObject {
+    @Published var banners: [String] = []
+    
+    // الرابط الحقيقي لملف الـ JSON الخاص بمتجرك
+    let sourceURL = "https://raw.githubusercontent.com/husszzzz/Ksign/refs/heads/main/banners.json"
+    
+    func fetchBanners() {
+        guard let url = URL(string: sourceURL) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let data = data {
+                do {
+                    let settings = try JSONDecoder().decode(StoreSettings.self, from: data)
+                    DispatchQueue.main.async {
+                        if !settings.banners.isEmpty {
+                            self.banners = settings.banners
+                        }
+                    }
+                } catch {
+                    print("فشل في قراءة ملف البنرات: \(error)")
+                    // صور احتياطية في حال فشل الاتصال
+                    DispatchQueue.main.async {
+                        if self.banners.isEmpty {
+                            self.banners = [
+                                "https://j.top4top.io/p_38372zx3z0.png",
+                                "https://k.top4top.io/p_3837l7crg1.png"
+                            ]
+                        }
+                    }
+                }
+            }
+        }.resume()
+    }
+}
+
 // MARK: - الشاشة الرئيسية
 struct HomeView: View {
-    let bannerImages = [
-        "https://j.top4top.io/p_38372zx3z0.png",
-        "https://k.top4top.io/p_3837l7crg1.png"
-    ]
-    
+    @StateObject private var bannerManager = BannerManager()
     @State private var currentBanner = 0
     let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
     
+    var body: some View {
+        NavigationView {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 25) {
+                    
+                    // 1. قسم البنرات المتحركة (مربوط بالسورس)
+                    if bannerManager.banners.isEmpty {
+                        RoundedRectangle(cornerRadius: 15)
+                            .fill(Color.gray.opacity(0.15))
+                            .frame(height: 180)
+                            .overlay(ProgressView())
+                            .padding(.horizontal)
+                    } else {
+                        TabView(selection: $currentBanner) {
+                            ForEach(0..<bannerManager.banners.count, id: \.self) { index in
+                                AsyncImage(url: URL(string: bannerManager.banners[index])) { phase in
+                                    if let image = phase.image {
+                                        image.resizable()
+                                             .aspectRatio(contentMode: .fill)
+                                    } else if phase.error != nil {
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .fill(Color.gray.opacity(0.3))
+                                            .overlay(Image(systemName: "photo").foregroundColor(.gray))
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 15)
+                                            .fill(Color.gray.opacity(0.15))
+                                            .overlay(ProgressView())
+                                    }
+                                }
+                                .frame(height: 180)
+                                .clipShape(RoundedRectangle(cornerRadius: 15))
+                                .padding(.horizontal)
+                                .tag(index)
+                            }
+                        }
+                        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+                        .frame(height: 180)
+                        .onReceive(timer) { _ in
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                if !bannerManager.banners.isEmpty {
+                                    currentBanner = (currentBanner + 1) % bannerManager.banners.count
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 2. قسم أحدث الإضافات
+                    NavigationLink(destination: RecentUpdatesView()) {
+                        _menuButton(title: "أحدث الإضافات والتحديثات", subtitle: "اكتشف التطبيقات والميزات الجديدة", icon: "sparkles", color: .blue)
+                    }
+                    
+                    // 3. قسم الترقية إلى VIP
+                    NavigationLink(destination: VIPUpgradeView()) {
+                        _menuButton(title: "الترقية إلى VIP", subtitle: "اشترك الآن واستمتع بمميزات حصرية", icon: "crown.fill", color: .orange)
+                    }
+                    
+                }
+                .padding(.vertical)
+            }
+            .navigationTitle("الرئيسية")
+            .onAppear {
+                bannerManager.fetchBanners()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func _menuButton(title: String, subtitle: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 15) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.2))
+                    .frame(width: 50, height: 50)
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(color)
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.left")
+                .foregroundColor(.gray)
+        }
+        .padding()
+        .background(Color(UIColor.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 15))
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - صفحة الترقية إلى VIP
+struct VIPUpgradeView: View {
     let commonFeatures = [
         "متجر تطبيقات معدلة ومكركة ومحذوفة",
         "تدعم جميع برامج التوقيع المختلفة",
@@ -41,82 +176,16 @@ struct HomeView: View {
     }
     
     var body: some View {
-        NavigationView {
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 25) {
-                    
-                    // 1. قسم البنرات المتحركة
-                    TabView(selection: $currentBanner) {
-                        ForEach(0..<bannerImages.count, id: \.self) { index in
-                            AsyncImage(url: URL(string: bannerImages[index])) { image in
-                                image.resizable()
-                                     .aspectRatio(contentMode: .fill)
-                            } placeholder: {
-                                Rectangle().fill(Color.gray.opacity(0.3))
-                                    .overlay(ProgressView())
-                            }
-                            .frame(height: 180)
-                            .clipShape(RoundedRectangle(cornerRadius: 15))
-                            .padding(.horizontal)
-                            .tag(index)
-                        }
-                    }
-                    .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-                    .frame(height: 180)
-                    .onReceive(timer) { _ in
-                        withAnimation(.easeInOut(duration: 0.5)) {
-                            currentBanner = (currentBanner + 1) % bannerImages.count
-                        }
-                    }
-                    
-                    // 2. قسم أحدث الإضافات
-                    NavigationLink(destination: RecentUpdatesView()) {
-                        HStack(spacing: 15) {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.blue.opacity(0.2))
-                                    .frame(width: 50, height: 50)
-                                Image(systemName: "sparkles")
-                                    .font(.title2)
-                                    .foregroundColor(.blue)
-                            }
-                            
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("أحدث الإضافات والتحديثات")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                Text("اكتشف التطبيقات والميزات الجديدة")
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.left")
-                                .foregroundColor(.gray)
-                        }
-                        .padding()
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                        .padding(.horizontal)
-                    }
-                    
-                    // 3. قسم الباقات (VIP)
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("ارتقِ إلى VIP")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal)
-                        
-                        ForEach(packages) { package in
-                            VIPPackageCard(package: package)
-                        }
-                    }
-                    .padding(.top, 10)
-                    
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(spacing: 15) {
+                ForEach(packages) { package in
+                    VIPPackageCard(package: package)
                 }
-                .padding(.vertical)
             }
-            .navigationTitle("الرئيسية")
+            .padding(.vertical)
         }
+        .navigationTitle("باقات VIP")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -132,9 +201,7 @@ struct VIPPackageCard: View {
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
-                
                 Spacer()
-                
                 Text(package.price)
                     .font(.headline)
                     .fontWeight(.bold)
@@ -198,7 +265,7 @@ struct VIPPackageCard: View {
     }
 }
 
-// MARK: - صفحة أحدث الإضافات (النسخة الآمنة والنهائية)
+// MARK: - صفحة أحدث الإضافات (المحدثة والمربوطة)
 struct RecentUpdatesView: View {
     @StateObject private var viewModel = SourcesViewModel.shared
     
@@ -208,24 +275,21 @@ struct RecentUpdatesView: View {
         animation: .snappy
     ) private var sources: FetchedResults<AltSource>
     
-    // غلاف حماية لمنع أخطاء الـ Xcode بالـ ForEach
     struct SafeApp: Identifiable {
         let id = UUID()
+        let source: ASRepository 
         let app: ASRepository.App
     }
     
     var recentApps: [SafeApp] {
         var allApps: [SafeApp] = []
-        
         for source in sources {
             if let repo = viewModel.sources[source] {
                 for app in repo.apps {
-                    allApps.append(SafeApp(app: app))
+                    allApps.append(SafeApp(source: repo, app: app))
                 }
             }
         }
-        
-        // نأخذ التطبيقات بدون ترتيب معقد لتجنب خطأ DateParsed
         return Array(allApps.prefix(50))
     }
     
@@ -243,34 +307,32 @@ struct RecentUpdatesView: View {
             } else {
                 ForEach(recentApps) { safeItem in
                     let app = safeItem.app
-                    HStack(spacing: 15) {
-                        AsyncImage(url: app.iconURL) { phase in
-                            if let image = phase.image {
-                                image.resizable()
-                                     .aspectRatio(contentMode: .fit)
-                            } else if phase.error != nil {
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(Color.gray.opacity(0.3))
-                                    .overlay(Image(systemName: "app.fill").foregroundColor(.gray))
-                            } else {
-                                ProgressView()
+                    NavigationLink(destination: SourceAppsDetailView(source: safeItem.source, app: app)) {
+                        HStack(spacing: 15) {
+                            AsyncImage(url: app.iconURL) { phase in
+                                if let image = phase.image {
+                                    image.resizable()
+                                         .aspectRatio(contentMode: .fit)
+                                } else if phase.error != nil {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color.gray.opacity(0.3))
+                                        .overlay(Image(systemName: "app.fill").foregroundColor(.gray))
+                                } else {
+                                    ProgressView()
+                                }
                             }
-                        }
-                        .frame(width: 50, height: 50)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(app.name ?? "تطبيق غير معروف")
-                                .font(.headline)
-                            Text("إصدار: \(app.version)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        Spacer()
-                        
-                        Button(action: {
-                            // التنزيل يتم برمجته لاحقاً
-                        }) {
+                            .frame(width: 50, height: 50)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(app.name ?? "تطبيق غير معروف")
+                                    .font(.headline)
+                                Text("إصدار: \(app.version ?? "1.0")")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Spacer()
+                            
                             Text("تنزيل")
                                 .font(.subheadline)
                                 .fontWeight(.bold)
@@ -280,8 +342,8 @@ struct RecentUpdatesView: View {
                                 .background(Color.blue.opacity(0.15))
                                 .clipShape(Capsule())
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                 }
             }
         }
@@ -289,7 +351,6 @@ struct RecentUpdatesView: View {
         .navigationTitle("أحدث الإضافات")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: Array(sources)) {
-            // تم تصحيح هذا السطر: نمرر sources مباشرة بدون Array
             await viewModel.fetchSources(sources)
         }
     }
