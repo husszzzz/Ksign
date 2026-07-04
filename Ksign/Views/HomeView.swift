@@ -1,4 +1,6 @@
 import SwiftUI
+import CoreData
+import AltSourceKit
 
 // MARK: - البيانات (Models)
 struct VIPPackage: Identifiable {
@@ -11,6 +13,7 @@ struct VIPPackage: Identifiable {
     let colors: [Color]
 }
 
+// MARK: - الشاشة الرئيسية
 struct HomeView: View {
     // روابط صور البنرات
     let bannerImages = [
@@ -21,7 +24,7 @@ struct HomeView: View {
     @State private var currentBanner = 0
     let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
     
-    // المميزات المشتركة لكل الباقات (حسب طلبك)
+    // المميزات المشتركة لكل الباقات
     let commonFeatures = [
         "متجر تطبيقات معدلة ومكركة ومحذوفة",
         "تدعم جميع برامج التوقيع المختلفة",
@@ -30,7 +33,7 @@ struct HomeView: View {
         "توفر ايضاً هاكات للألعاب القوية مجاناً"
     ]
     
-    // قائمة باقات الـ VIP بالأسعار والضمان الجديد
+    // قائمة باقات الـ VIP
     var packages: [VIPPackage] {
         [
             VIPPackage(title: "الباقة النارية", price: "10,000 د.ع", duration: "سنة كاملة", warranty: "شهر واحد", features: commonFeatures, colors: [Color.orange, Color.red]),
@@ -69,7 +72,7 @@ struct HomeView: View {
                         }
                     }
                     
-                    // 2. قسم أحدث الإضافات (مربوط بصفحة التحديثات)
+                    // 2. قسم أحدث الإضافات (مربوط بصفحة التحديثات الحقيقية)
                     NavigationLink(destination: RecentUpdatesView()) {
                         HStack(spacing: 15) {
                             ZStack {
@@ -199,36 +202,78 @@ struct VIPPackageCard: View {
     }
 }
 
-// MARK: - صفحة أحدث الإضافات (آخر 50 تطبيق)
+// MARK: - صفحة أحدث الإضافات (آخر 50 تطبيق حقيقي من متجرك)
 struct RecentUpdatesView: View {
-    // ملاحظة لحسين: هذا المتغير يمثل آخر 50 تطبيق. 
-    // لاحقاً يمكنك استبداله بمصفوفة التطبيقات القادمة من JSON متجرك
-    // مثال: AppManager.shared.apps.prefix(50)
+    // استدعاء محرك المتجر
+    @StateObject private var viewModel = SourcesViewModel.shared
     
-    let recentApps = Array(1...50).map { "تطبيق رقم \($0)" } // بيانات وهمية مؤقتة للحفاظ على الواجهة
+    // جلب المصادر من قاعدة البيانات
+    @FetchRequest(
+        entity: AltSource.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \AltSource.name, ascending: true)],
+        animation: .snappy
+    ) private var sources: FetchedResults<AltSource>
+    
+    // تصفية التطبيقات وترتيبها حسب الأحدث
+    var recentApps: [ASApp] {
+        var allApps: [ASApp] = []
+        
+        // جمع كل التطبيقات من المصادر
+        for source in sources {
+            if let repo = viewModel.batchResults[source] {
+                allApps.append(contentsOf: repo.apps)
+            }
+        }
+        
+        // الترتيب من الأحدث للأقدم وأخذ أول 50
+        return Array(allApps.sorted { 
+            ($0.versionDate ?? Date.distantPast) > ($1.versionDate ?? Date.distantPast) 
+        }.prefix(50))
+    }
     
     var body: some View {
         List {
-            Section(header: Text("آخر 50 تحديث")) {
-                ForEach(recentApps, id: \.self) { appName in
-                    HStack {
-                        // أيقونة التطبيق
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 50, height: 50)
-                            .overlay(Image(systemName: "app.fill").foregroundColor(.gray))
+            if recentApps.isEmpty {
+                VStack {
+                    Spacer()
+                    ProgressView("جاري جلب التحديثات...")
+                        .padding()
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(recentApps, id: \.bundleIdentifier) { app in
+                    HStack(spacing: 15) {
+                        // صورة التطبيق من السيرفر
+                        AsyncImage(url: app.iconURL) { phase in
+                            if let image = phase.image {
+                                image.resizable()
+                                     .aspectRatio(contentMode: .fit)
+                            } else if phase.error != nil {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.gray.opacity(0.3))
+                                    .overlay(Image(systemName: "app.fill").foregroundColor(.gray))
+                            } else {
+                                ProgressView()
+                            }
+                        }
+                        .frame(width: 50, height: 50)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(appName)
+                            // اسم التطبيق وإصداره
+                            Text(app.name)
                                 .font(.headline)
-                            Text("تم التحديث مؤخراً")
+                            Text("إصدار: \(app.version)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         Spacer()
                         
+                        // زر التنزيل
                         Button(action: {
-                            // إجراء التنزيل
+                            // يمكن لاحقاً برمجته للتنزيل
                         }) {
                             Text("تنزيل")
                                 .font(.subheadline)
@@ -247,5 +292,9 @@ struct RecentUpdatesView: View {
         .listStyle(.plain)
         .navigationTitle("أحدث الإضافات")
         .navigationBarTitleDisplayMode(.inline)
+        // تحديث المصادر تلقائياً
+        .task(id: Array(sources)) {
+            await viewModel.fetchSources(sources)
+        }
     }
 }
