@@ -9,6 +9,61 @@
 import SwiftUI
 import NimbleViews
 
+// MARK: - محرك إعدادات المتجر (سورس قياسي)
+struct SettingsRemoteConfig: Codable {
+    let settings_banners: [String]?
+    let support_url: String?
+    let channel_url: String?
+}
+
+class SettingsConfigManager: ObservableObject {
+    @Published var settingsBanners: [String] = []
+    @Published var supportURL: String = "https://t.me/OM_G9"
+    @Published var channelURL: String = "https://t.me/hassanyIPA"
+    
+    // رابط السورس القياسي الخاص بك
+    let sourceURL = "https://raw.githubusercontent.com/husszzzz/Ksign/refs/heads/main/banners.json"
+    
+    func fetchSettings() {
+        guard let url = URL(string: sourceURL) else { return }
+        
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let data = data {
+                do {
+                    let config = try JSONDecoder().decode(SettingsRemoteConfig.self, from: data)
+                    DispatchQueue.main.async {
+                        // تحديث البنرات إذا كانت موجودة بالرابط
+                        if let fetchedBanners = config.settings_banners, !fetchedBanners.isEmpty {
+                            self.settingsBanners = fetchedBanners
+                        } else {
+                            // صور احتياطية في حال خطأ بالسورس
+                            self.settingsBanners = [
+                                "https://up6.cc/2026/07/178299404288331.png",
+                                "https://up6.cc/2026/07/178299412751421.png"
+                            ]
+                        }
+                        
+                        // تحديث الروابط
+                        if let support = config.support_url { self.supportURL = support }
+                        if let channel = config.channel_url { self.channelURL = channel }
+                    }
+                } catch {
+                    print("فشل جلب إعدادات المتجر: \(error)")
+                    // تحميل الصور الاحتياطية عند الفشل لتجنب الشاشة البيضاء
+                    DispatchQueue.main.async {
+                        if self.settingsBanners.isEmpty {
+                            self.settingsBanners = [
+                                "https://up6.cc/2026/07/178299404288331.png",
+                                "https://up6.cc/2026/07/178299412751421.png"
+                            ]
+                        }
+                    }
+                }
+            }
+        }.resume()
+    }
+}
+
 // MARK: - View
 struct SettingsView: View {
     @AppStorage("feather.selectedCert") private var _storedSelectedCert: Int = 0
@@ -17,6 +72,9 @@ struct SettingsView: View {
         sortDescriptors: [NSSortDescriptor(keyPath: \CertificatePair.date, ascending: false)],
         animation: .snappy
     ) private var _certificates: FetchedResults<CertificatePair>
+    
+    // استدعاء محرك الإعدادات
+    @StateObject private var configManager = SettingsConfigManager()
     
     // متغير للتحكم في ظهور رسالة "حول المتجر"
     @State private var showAboutMessage = false
@@ -36,9 +94,9 @@ struct SettingsView: View {
         NBNavigationView(.localized("Settings")) {
             Form {
                 
-                // 1. بانر الصور المتحرك (بديل التبرعات)
+                // 1. بانر الصور المتحرك (مربوط بالسورس)
                 Section {
-                    StoreBannerView()
+                    StoreBannerView(manager: configManager)
                 }
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
@@ -46,7 +104,7 @@ struct SettingsView: View {
                 // 2. قسم حول وقناة التليجرام
                 _feedback()
                 
-                // 3. المظهر (تم حذف أيقونة التطبيق حسب الطلب)
+                // 3. المظهر
                 Section {
                     NavigationLink(destination: AppearanceView()) {
                         Label(.localized("Appearance"), systemImage: "paintbrush")
@@ -100,6 +158,10 @@ struct SettingsView: View {
 
             }
         }
+        .onAppear {
+            // جلب البيانات فور فتح صفحة الإعدادات
+            configManager.fetchSettings()
+        }
     }
 }
 
@@ -108,7 +170,7 @@ extension SettingsView {
     @ViewBuilder
     private func _feedback() -> some View {
         Section {
-            // زر "حول المتجر" لفتح النافذة المنبثقة
+            // زر "حول المتجر"
             Button(action: {
                 showAboutMessage.toggle()
             }) {
@@ -121,9 +183,11 @@ extension SettingsView {
                 StoreAboutMessageView()
             }
             
-            // زر قناة التليجرام الخاص بالمتجر
+            // زر قناة التليجرام المربوط بالسورس القياسي
             Button("قناة التليجرام", systemImage: "paperplane.circle") {
-                UIApplication.open("https://t.me/hassanyIPA")
+                if let url = URL(string: configManager.channelURL) {
+                    UIApplication.shared.open(url)
+                }
             }
         } header: {
             Text("حول")
@@ -134,7 +198,7 @@ extension SettingsView {
     private func _directories() -> some View {
         NBSection(.localized("Misc")) {
             Button(.localized("Open Documents"), systemImage: "folder") {
-                UIApplication.open(URL.documentsDirectory.toSharedDocumentsURL()!.absoluteString) // تعديل طفيف لضمان عمل الرابط
+                UIApplication.open(URL.documentsDirectory.toSharedDocumentsURL()!.absoluteString)
             }
             Button(.localized("Open Archives"), systemImage: "folder") {
                 UIApplication.open(FileManager.default.archives.toSharedDocumentsURL()!.absoluteString)
@@ -147,48 +211,68 @@ extension SettingsView {
 
 // MARK: - إضافات متجر بلس الخاصة (Hassany Store)
 
-// 1. واجهة البانر المتحرك
+// 1. واجهة البانر المتحرك السريعة
 struct StoreBannerView: View {
+    @ObservedObject var manager: SettingsConfigManager
     @State private var currentIndex = 0
-    // مؤقت لتغيير الصورة كل 4 ثواني
     private let timer = Timer.publish(every: 4, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        TabView(selection: $currentIndex) {
-            
-            // الصورة الأولى (عرض فقط)
-            AsyncImage(url: URL(string: "https://up6.cc/2026/07/178299404288331.png")) { phase in
-                if let image = phase.image {
-                    image.resizable().scaledToFill()
-                } else {
-                    Color.gray.opacity(0.1)
-                }
-            }
-            .tag(0)
-            
-            // الصورة الثانية (الدعم الفني قابلة للضغط)
-            Button(action: {
-                UIApplication.open("https://t.me/OM_G9")
-            }) {
-                AsyncImage(url: URL(string: "https://up6.cc/2026/07/178299412751421.png")) { phase in
-                    if let image = phase.image {
-                        image.resizable().scaledToFill()
+        if manager.settingsBanners.isEmpty {
+            // شاشة تحميل أنيقة أثناء جلب الصور من السورس
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.gray.opacity(0.15))
+                .frame(height: 160)
+                .padding(.horizontal)
+                .overlay(ProgressView())
+        } else {
+            TabView(selection: $currentIndex) {
+                ForEach(0..<manager.settingsBanners.count, id: \.self) { index in
+                    
+                    if index == 1 {
+                        // الصورة الثانية (الدعم الفني) قابلة للضغط ومربوطة بالسورس
+                        Button(action: {
+                            if let url = URL(string: manager.supportURL) {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            _asyncBannerImage(url: manager.settingsBanners[index])
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .tag(index)
                     } else {
-                        Color.gray.opacity(0.1)
+                        // باقي الصور (عرض فقط)
+                        _asyncBannerImage(url: manager.settingsBanners[index])
+                            .tag(index)
                     }
                 }
             }
-            .buttonStyle(PlainButtonStyle())
-            .tag(1)
-            
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+            .frame(height: 160)
+            .cornerRadius(12)
+            .padding(.horizontal)
+            .onReceive(timer) { _ in
+                withAnimation {
+                    if !manager.settingsBanners.isEmpty {
+                        currentIndex = (currentIndex + 1) % manager.settingsBanners.count
+                    }
+                }
+            }
         }
-        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-        .frame(height: 160)
-        .cornerRadius(12)
-        .padding(.horizontal)
-        .onReceive(timer) { _ in
-            withAnimation {
-                currentIndex = currentIndex == 0 ? 1 : 0
+    }
+    
+    // تصميم الصورة مع مؤشر تحميل احترافي
+    @ViewBuilder
+    private func _asyncBannerImage(url: String) -> some View {
+        AsyncImage(url: URL(string: url)) { phase in
+            if let image = phase.image {
+                image.resizable().scaledToFill()
+            } else if phase.error != nil {
+                Color.gray.opacity(0.1)
+                    .overlay(Image(systemName: "photo").foregroundColor(.gray))
+            } else {
+                Color.gray.opacity(0.15)
+                    .overlay(ProgressView())
             }
         }
     }
@@ -233,7 +317,6 @@ struct StoreAboutMessageView: View {
                     Spacer()
                 }
                 .padding(20)
-                // إجبار التنسيق من اليمين لليسار لضمان ظهور النص العربي بشكل مثالي
                 .environment(\.layoutDirection, .rightToLeft)
             }
             .navigationTitle("حول المتجر")
@@ -249,7 +332,6 @@ struct StoreAboutMessageView: View {
         }
     }
     
-    // دالة مساعدة لتصميم شكل النقاط (Bullet Points)
     private func BulletPointRow(text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(text)
