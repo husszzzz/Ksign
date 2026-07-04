@@ -12,23 +12,33 @@ struct VIPPackage: Identifiable {
 }
 
 struct HomeView: View {
-    // روابط الصور اللي دزيتها
+    // روابط صور البنرات
     let bannerImages = [
         "https://j.top4top.io/p_38372zx3z0.png",
         "https://k.top4top.io/p_3837l7crg1.png"
     ]
     
     @State private var currentBanner = 0
-    // مؤقت لتحريك الصور كل 3 ثواني
     let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
     
-    // قائمة باقات الـ VIP
-    let packages = [
-        VIPPackage(title: "الباقة النارية", price: "10,000 د.ع", duration: "سنة كاملة", warranty: "شهر واحد", features: ["الوصول الكامل لمكتبة Hassany Store", "خدمة دعم فوري", "تطبيقات محذوفة ومعدلة"], colors: [Color.orange, Color.red]),
-        VIPPackage(title: "الباقة النارية VIP", price: "15,000 د.ع", duration: "سنة كاملة", warranty: "شهرين", features: ["جميع مميزات الباقة النارية", "أدوات حصرية للجلبريك", "تحديثات مبكرة للتطبيقات"], colors: [Color.red, Color.purple]),
-        VIPPackage(title: "الباقة الألماسية", price: "25,000 د.ع", duration: "سنة كاملة", warranty: "6 أشهر", features: ["توقيع تلقائي للتطبيقات", "تطبيقات بلس حصرية", "دعم فني مخصص 24/7"], colors: [Color.blue, Color.cyan]),
-        VIPPackage(title: "الباقة السوبر VIP", price: "30,000 د.ع", duration: "سنة كاملة", warranty: "سنة كاملة", features: ["جميع المميزات المذكورة", "طلب تطبيقات مخصصة", "بدون إعلانات نهائياً"], colors: [Color.black, Color.yellow.opacity(0.8)])
+    // المميزات المشتركة لكل الباقات (حسب طلبك)
+    let commonFeatures = [
+        "متجر تطبيقات معدلة ومكركة ومحذوفة",
+        "تدعم جميع برامج التوقيع المختلفة",
+        "تفعيل فوري خلال خمس دقائق",
+        "خدمة دعم فني متكاملة أثناء المدة",
+        "توفر ايضاً هاكات للألعاب القوية مجاناً"
     ]
+    
+    // قائمة باقات الـ VIP بالأسعار والضمان الجديد
+    var packages: [VIPPackage] {
+        [
+            VIPPackage(title: "الباقة النارية", price: "10,000 د.ع", duration: "سنة كاملة", warranty: "شهر واحد", features: commonFeatures, colors: [Color.orange, Color.red]),
+            VIPPackage(title: "الباقة النارية VIP", price: "15,000 د.ع", duration: "سنة كاملة", warranty: "شهرين", features: commonFeatures, colors: [Color.red, Color.purple]),
+            VIPPackage(title: "الباقة الألماسية", price: "25,000 د.ع", duration: "سنة كاملة", warranty: "6 أشهر", features: commonFeatures, colors: [Color.blue, Color.cyan]),
+            VIPPackage(title: "الباقة السوبر VIP", price: "30,000 د.ع", duration: "سنة كاملة", warranty: "سنة كاملة", features: commonFeatures, colors: [Color.black, Color.yellow.opacity(0.8)])
+        ]
+    }
     
     var body: some View {
         NavigationView {
@@ -59,8 +69,8 @@ struct HomeView: View {
                         }
                     }
                     
-                    // 2. قسم أحدث الإضافات (أيقونة مرتبة)
-                    NavigationLink(destination: Text("صفحة التحديثات قريباً...")) {
+                    // 2. قسم أحدث الإضافات (مربوط بصفحة التحديثات)
+                    NavigationLink(destination: RecentUpdatesView()) {
                         HStack(spacing: 15) {
                             ZStack {
                                 Circle()
@@ -110,7 +120,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - تصميم بطاقة الباقة (مع حركة النبض)
+// MARK: - تصميم بطاقة الباقة
 struct VIPPackageCard: View {
     let package: VIPPackage
     @State private var isAnimating = false
@@ -153,12 +163,16 @@ struct VIPPackageCard: View {
                         Text(feature)
                             .font(.subheadline)
                             .foregroundColor(.white)
+                            .multilineTextAlignment(.leading)
                     }
                 }
             }
             
+            // زر الاشتراك (ينقل مباشرة إلى التلجرام)
             Button(action: {
-                // أمر الاشتراك
+                if let telegramURL = URL(string: "https://t.me/OM_G9") {
+                    UIApplication.shared.open(telegramURL)
+                }
             }) {
                 Text("اشترك الآن")
                     .font(.headline)
@@ -176,12 +190,62 @@ struct VIPPackageCard: View {
         )
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .padding(.horizontal)
-        // تأثير النبض (Breathing Animation)
         .scaleEffect(isAnimating ? 1.015 : 1.0)
         .onAppear {
             withAnimation(Animation.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
                 isAnimating = true
             }
         }
+    }
+}
+
+// MARK: - صفحة أحدث الإضافات (آخر 50 تطبيق)
+struct RecentUpdatesView: View {
+    // ملاحظة لحسين: هذا المتغير يمثل آخر 50 تطبيق. 
+    // لاحقاً يمكنك استبداله بمصفوفة التطبيقات القادمة من JSON متجرك
+    // مثال: AppManager.shared.apps.prefix(50)
+    
+    let recentApps = Array(1...50).map { "تطبيق رقم \($0)" } // بيانات وهمية مؤقتة للحفاظ على الواجهة
+    
+    var body: some View {
+        List {
+            Section(header: Text("آخر 50 تحديث")) {
+                ForEach(recentApps, id: \.self) { appName in
+                    HStack {
+                        // أيقونة التطبيق
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.3))
+                            .frame(width: 50, height: 50)
+                            .overlay(Image(systemName: "app.fill").foregroundColor(.gray))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(appName)
+                                .font(.headline)
+                            Text("تم التحديث مؤخراً")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        
+                        Button(action: {
+                            // إجراء التنزيل
+                        }) {
+                            Text("تنزيل")
+                                .font(.subheadline)
+                                .fontWeight(.bold)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 6)
+                                .background(Color.blue.opacity(0.15))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+        .listStyle(.plain)
+        .navigationTitle("أحدث الإضافات")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
