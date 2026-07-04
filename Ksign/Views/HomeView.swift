@@ -15,7 +15,6 @@ struct VIPPackage: Identifiable {
 
 // MARK: - الشاشة الرئيسية
 struct HomeView: View {
-    // روابط صور البنرات
     let bannerImages = [
         "https://j.top4top.io/p_38372zx3z0.png",
         "https://k.top4top.io/p_3837l7crg1.png"
@@ -24,7 +23,6 @@ struct HomeView: View {
     @State private var currentBanner = 0
     let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
     
-    // المميزات المشتركة لكل الباقات
     let commonFeatures = [
         "متجر تطبيقات معدلة ومكركة ومحذوفة",
         "تدعم جميع برامج التوقيع المختلفة",
@@ -33,7 +31,6 @@ struct HomeView: View {
         "توفر ايضاً هاكات للألعاب القوية مجاناً"
     ]
     
-    // قائمة باقات الـ VIP
     var packages: [VIPPackage] {
         [
             VIPPackage(title: "الباقة النارية", price: "10,000 د.ع", duration: "سنة كاملة", warranty: "شهر واحد", features: commonFeatures, colors: [Color.orange, Color.red]),
@@ -72,7 +69,7 @@ struct HomeView: View {
                         }
                     }
                     
-                    // 2. قسم أحدث الإضافات (مربوط بصفحة التحديثات الحقيقية)
+                    // 2. قسم أحدث الإضافات
                     NavigationLink(destination: RecentUpdatesView()) {
                         HStack(spacing: 15) {
                             ZStack {
@@ -171,7 +168,6 @@ struct VIPPackageCard: View {
                 }
             }
             
-            // زر الاشتراك (ينقل مباشرة إلى التلجرام)
             Button(action: {
                 if let telegramURL = URL(string: "https://t.me/OM_G9") {
                     UIApplication.shared.open(telegramURL)
@@ -202,30 +198,26 @@ struct VIPPackageCard: View {
     }
 }
 
-// MARK: - صفحة أحدث الإضافات (آخر 50 تطبيق حقيقي من متجرك)
+// MARK: - صفحة أحدث الإضافات (النسخة الحقيقية المربوطة بالمتجر)
 struct RecentUpdatesView: View {
-    // استدعاء محرك المتجر
     @StateObject private var viewModel = SourcesViewModel.shared
     
-    // جلب المصادر من قاعدة البيانات
     @FetchRequest(
         entity: AltSource.entity(),
         sortDescriptors: [NSSortDescriptor(keyPath: \AltSource.name, ascending: true)],
         animation: .snappy
     ) private var sources: FetchedResults<AltSource>
     
-    // تصفية التطبيقات وترتيبها حسب الأحدث
-    var recentApps: [ASApp] {
-        var allApps: [ASApp] = []
+    var recentApps: [ASRepository.App] {
+        var allApps: [ASRepository.App] = []
         
-        // جمع كل التطبيقات من المصادر
         for source in sources {
-            if let repo = viewModel.batchResults[source] {
+            // استخدام التسمية الصحيحة viewModel.sources
+            if let repo = viewModel.sources[source] {
                 allApps.append(contentsOf: repo.apps)
             }
         }
         
-        // الترتيب من الأحدث للأقدم وأخذ أول 50
         return Array(allApps.sorted { 
             ($0.versionDate ?? Date.distantPast) > ($1.versionDate ?? Date.distantPast) 
         }.prefix(50))
@@ -245,7 +237,6 @@ struct RecentUpdatesView: View {
             } else {
                 ForEach(recentApps, id: \.bundleIdentifier) { app in
                     HStack(spacing: 15) {
-                        // صورة التطبيق من السيرفر
                         AsyncImage(url: app.iconURL) { phase in
                             if let image = phase.image {
                                 image.resizable()
@@ -262,8 +253,8 @@ struct RecentUpdatesView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            // اسم التطبيق وإصداره
-                            Text(app.name)
+                            // إضافة حماية Optional لاسم التطبيق
+                            Text(app.name ?? "تطبيق غير معروف")
                                 .font(.headline)
                             Text("إصدار: \(app.version)")
                                 .font(.caption)
@@ -271,9 +262,8 @@ struct RecentUpdatesView: View {
                         }
                         Spacer()
                         
-                        // زر التنزيل
                         Button(action: {
-                            // يمكن لاحقاً برمجته للتنزيل
+                            // التنزيل (يتم برمجته لاحقاً)
                         }) {
                             Text("تنزيل")
                                 .font(.subheadline)
@@ -292,9 +282,8 @@ struct RecentUpdatesView: View {
         .listStyle(.plain)
         .navigationTitle("أحدث الإضافات")
         .navigationBarTitleDisplayMode(.inline)
-        // تحديث المصادر تلقائياً
         .task(id: Array(sources)) {
-            await viewModel.fetchSources(sources)
+            await viewModel.fetchSources(Array(sources))
         }
     }
 }
