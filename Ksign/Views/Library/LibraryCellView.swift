@@ -25,9 +25,6 @@ struct LibraryCellView: View {
     @Binding var selectedAppDylibsPresenting: AnyApp?
     @Binding var selectedApps: Set<String>
     
-    // متغير الحركة (التنفس)
-    @State private var isAnimating = false
-    
     private var _isSelected: Bool {
         selectedApps.contains(app.uuid ?? "")
     }
@@ -37,7 +34,7 @@ struct LibraryCellView: View {
         let isEditing = editMode?.wrappedValue == .active
         
         HStack(spacing: 12) {
-            // زر التحديد في وضع التعديل
+            // 1. زر التحديد في وضع التعديل (Edit Mode)
             if isEditing {
                 Button {
                     _toggleSelection()
@@ -47,78 +44,74 @@ struct LibraryCellView: View {
                         .font(.title2)
                 }
                 .buttonStyle(.borderless)
+                .transition(.scale)
             }
             
-            // بداية البطاقة (Card)
-            VStack(spacing: 16) {
-                // الجزء العلوي: الأيقونة، الاسم، الإصدار، وحالة الشهادة
-                HStack(alignment: .center, spacing: 12) {
-                    FRAppIconView(app: app, size: 60)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(app.name ?? .localized("Unknown"))
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                        
-                        Text(_desc)
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                            .lineLimit(1)
-                        
-                        // كبسولة حالة الشهادة (تظهر فقط إذا كان التطبيق موقع)
-                        if !isEditing, app.isSigned, let certInfo = certInfo {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock.fill")
-                                    .font(.system(size: 10))
-                                Text(certInfo.formatted)
-                                    .font(.system(size: 10, weight: .bold))
-                            }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(certInfo.color)
-                            .clipShape(Capsule())
-                            .padding(.top, 2)
-                        }
-                    }
-                    Spacer()
-                }
+            // 2. أيقونة التطبيق
+            FRAppIconView(app: app, size: 54)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 1)
+            
+            // 3. معلومات التطبيق (الاسم، الإصدار، حالة الشهادة)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(app.name ?? .localized("Unknown"))
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
                 
-                // الجزء السفلي: الأزرار (تظهر فقط إذا لم نكن في وضع التعديل)
-                if !isEditing {
-                    HStack(spacing: 12) {
+                Text(_desc)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                
+                // كبسولة حالة الشهادة (تظهر أسفل الاسم إذا كان التطبيق موقّع)
+                if !isEditing, app.isSigned, let certInfo = certInfo {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 10))
+                        Text(certInfo.formatted)
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundColor(certInfo.color)
+                    .padding(.top, 1)
+                }
+            }
+            
+            Spacer(minLength: 8)
+            
+            // 4. الأزرار الجانبية الأنيقة (تظهر فقط إذا لم نكن في وضع التعديل)
+            if !isEditing {
+                HStack(spacing: 8) {
+                    
+                    // زر التوقيع/التثبيت (Pill Button - يشبه App Store)
+                    Button {
+                        let impact = UIImpactFeedbackGenerator(style: .light)
+                        impact.impactOccurred()
                         
-                        // 1. الزر الأخضر (توقيع وتثبيت / أو تثبيت)
-                        Button {
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                            impactFeedback.impactOccurred()
-                            
-                            if app.isSigned {
-                                selectedInstallAppPresenting = AnyApp(base: app)
-                            } else {
-                                selectedSigningAppPresenting = AnyApp(base: app, signAndInstall: true)
-                            }
-                        } label: {
-                            Text(app.isSigned ? "تثبيت" : "توقيع وتثبيت")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color(red: 0.1, green: 0.75, blue: 0.4)) // أخضر احترافي
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        if app.isSigned {
+                            selectedInstallAppPresenting = AnyApp(base: app)
+                        } else {
+                            selectedSigningAppPresenting = AnyApp(base: app, signAndInstall: true)
                         }
-                        .buttonStyle(.borderless)
-                        
-                        // 2. الزر الرصاصي (القائمة العصرية - Menu)
-                        Menu {
+                    } label: {
+                        Text(app.isSigned ? "تثبيت" : "توقيع")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 6)
+                            // لون أزرق للتثبيت، وأخضر للتوقيع
+                            .background(app.isSigned ? Color.blue : Color(red: 0.1, green: 0.75, blue: 0.4))
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.borderless)
+                    
+                    // زر القائمة المنسدلة (ثلاث نقاط)
+                    Menu {
+                        Section {
                             if app.isSigned {
                                 if let id = app.identifier {
                                     Button { UIApplication.openApp(with: id) } label: {
-                                        Label("فتح", systemImage: "app.badge.checkmark")
+                                        Label("فتح التطبيق", systemImage: "app.badge.checkmark")
                                     }
                                 }
                                 Button { selectedSigningAppPresenting = AnyApp(base: app) } label: {
@@ -126,58 +119,53 @@ struct LibraryCellView: View {
                                 }
                             } else {
                                 Button { selectedSigningAppPresenting = AnyApp(base: app) } label: {
-                                    Label("توقيع", systemImage: "signature")
+                                    Label("توقيع يدوي", systemImage: "signature")
                                 }
                             }
                             
                             Button { selectedInstallAppPresenting = AnyApp(base: app, archive: true) } label: {
-                                Label("تصدير", systemImage: "square.and.arrow.up")
+                                Label("تصدير (IPA)", systemImage: "square.and.arrow.up")
                             }
-                            
+                        }
+                        
+                        Section {
                             Button { selectedAppDylibsPresenting = AnyApp(base: app) } label: {
-                                Label("إظهار المكتبات", systemImage: "building.columns")
+                                Label("إظهار المكتبات (Dylibs)", systemImage: "building.columns")
                             }
                             
                             Button { selectedInfoAppPresenting = AnyApp(base: app) } label: {
-                                Label("عرض المعلومات", systemImage: "info.circle")
+                                Label("معلومات مفصلة", systemImage: "info.circle")
                             }
-                            
-                            // زر الحذف باللون الأحمر التلقائي
-                            Button(role: .destructive) { Storage.shared.deleteApp(for: app) } label: {
-                                Label("حذف", systemImage: "trash")
-                            }
-                        } label: {
-                            Text("خيارات أخرى")
-                                .font(.subheadline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color.white.opacity(0.15)) // رصاصي شفاف
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
+                        
+                        Section {
+                            Button(role: .destructive) { Storage.shared.deleteApp(for: app) } label: {
+                                Label("حذف التطبيق", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(.secondary)
+                            .frame(width: 30, height: 30)
+                            .background(Color.secondary.opacity(0.15))
+                            .clipShape(Circle())
                     }
                 }
             }
-            .padding(16)
-            .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.8)) // لون البطاقة
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
-            // تأثير النبض (التنفس)
-            .scaleEffect(_isSelected ? 0.95 : (isAnimating ? 1.015 : 1.0))
-            .onTapGesture {
-                if isEditing { _toggleSelection() }
-            }
-            .onAppear {
-                // تشغيل الأنيميشن بشكل مستمر وهادئ
-                withAnimation(Animation.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                    isAnimating = true
-                }
-            }
+        }
+        .padding(12)
+        // خلفية الكارت أنيقة وخفيفة
+        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: Color.black.opacity(0.08), radius: 5, x: 0, y: 2)
+        // تأثير الضغط
+        .scaleEffect(_isSelected ? 0.96 : 1.0)
+        .onTapGesture {
+            if isEditing { _toggleSelection() }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        // إخفاء فواصل القائمة التقليدية والخلفية المزعجة
+        .padding(.vertical, 6)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
@@ -186,7 +174,7 @@ struct LibraryCellView: View {
     // MARK: - الدوال المساعدة
     private var _desc: String {
         if let version = app.version, let id = app.identifier {
-            return "\(version) • \(id)"
+            return "v\(version) • \(id)"
         } else {
             return .localized("Unknown")
         }
@@ -197,7 +185,7 @@ struct LibraryCellView: View {
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8, blendDuration: 0)) {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7, blendDuration: 0)) {
             if _isSelected {
                 selectedApps.remove(uuid)
             } else {
