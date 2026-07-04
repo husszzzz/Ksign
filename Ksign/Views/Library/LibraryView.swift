@@ -113,7 +113,7 @@ struct LibraryView: View {
 			}
 			.searchable(text: $_searchText, placement: .platform())
             .overlay {
-                // الكود الجديد الخاص بتصميم "لا توجد تطبيقات" مع الزر الأخضر
+                // التصميم مع اللون الأزرق الكلاسيكي
                 if _filteredSignedApps.isEmpty && _filteredImportedApps.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "signature")
@@ -142,10 +142,10 @@ struct LibraryView: View {
                         } label: {
                             Text(.localized("Import from Files"))
                                 .font(.headline)
-                                .foregroundColor(Color(red: 0.1, green: 0.75, blue: 0.4)) // لون أخضر مطابق للصورة
+                                .foregroundColor(.blue) // اللون الأزرق الكلاسيكي
                                 .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
-                                .background(Color(red: 0.1, green: 0.75, blue: 0.4).opacity(0.15)) // خلفية خضراء شفافة
+                                .background(Color.blue.opacity(0.15)) // خلفية زرقاء شفافة
                                 .clipShape(Capsule())
                         }
                         .padding(.top, 10)
@@ -181,12 +181,21 @@ struct LibraryView: View {
 						.disabled(_selectedApps.isEmpty)
 					}
 				} else {
-					NBToolbarMenu(
-						systemImage: "plus",
-						style: .icon,
-						placement: .topBarTrailing
-					) {
-                        _importActions()
+                    // الأزرار العلوية الجديدة (مربوطة بشكل مباشر وصحيح)
+                    ToolbarItemGroup(placement: .topBarTrailing) {
+                        Button {
+                            _isDownloadingPresenting = true
+                        } label: {
+                            Image(systemName: "link")
+                                .font(.system(size: 16, weight: .medium))
+                        }
+                        
+                        Button {
+                            _isImportingPresenting = true
+                        } label: {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 16, weight: .medium))
+                        }
                     }
 				}
 			}
@@ -224,6 +233,7 @@ struct LibraryView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
             }
+            // نافذة استيراد الملفات (معالجة الملفات)
 			.sheet(isPresented: $_isImportingPresenting) {
 				FileImporterRepresentableView(
 					allowedContentTypes:  [.ipa, .tipa],
@@ -243,15 +253,17 @@ struct LibraryView: View {
 					}
 				)
 			}
+            // نافذة التحميل من رابط (مربوطة بزر الرابط العلوي)
 			.alert(.localized("Import from URL"), isPresented: $_isDownloadingPresenting) {
 				TextField(.localized("URL"), text: $_alertDownloadString)
 				Button(.localized("Cancel"), role: .cancel) {
 					_alertDownloadString = ""
 				}
 				Button(.localized("OK")) {
-					if let url = URL(string: _alertDownloadString) {
+					if let url = URL(string: _alertDownloadString), !_alertDownloadString.isEmpty {
 						_ = downloadManager.startDownload(from: url, id: "FeatherManualDownload_\(UUID().uuidString)")
 					}
+                    _alertDownloadString = ""
 				}
 			}
 			.onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("feather.installApp"))) { notification in
@@ -271,19 +283,6 @@ struct LibraryView: View {
         }
     }
 }
-
-extension LibraryView {
-    @ViewBuilder
-    private func _importActions() -> some View {
-        Button(.localized("Import from Files"), systemImage: "folder") {
-            _isImportingPresenting = true
-        }
-        Button(.localized("Import from URL"), systemImage: "globe") {
-            _isDownloadingPresenting = true
-        }
-    }
-}
-
 
 // MARK: - Extension: View (Edit Mode Functions)
 extension LibraryView {
