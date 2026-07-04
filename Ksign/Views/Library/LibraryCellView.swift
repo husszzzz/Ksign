@@ -38,7 +38,9 @@ struct LibraryCellView: View {
         let isEditing = editMode?.wrappedValue == .active
         
         ZStack {
-            // وجه الكارت الأمامي (معلومات التطبيق)
+            // ==========================================
+            // الوجه الأمامي للكارت (معلومات التطبيق)
+            // ==========================================
             VStack(spacing: 12) {
                 FRAppIconView(app: app, size: 70)
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -77,15 +79,25 @@ struct LibraryCellView: View {
                 }
             }
             .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 170)
+            .frame(maxWidth: .infinity, minHeight: 180)
             .background(Color(UIColor.secondarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.06), lineWidth: 1))
             .opacity(isFlipped ? 0.0 : 1.0) // إخفاء الوجه عند الانقلاب
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if isEditing {
+                    _toggleSelection()
+                } else {
+                    if !isFlipped { toggleFlip() }
+                }
+            }
             
-            // ظهر الكارت الخلفي (لوحة خيارات التحكم)
+            // ==========================================
+            // الظهر الخلفي للكارت (لوحة التحكم والأزرار)
+            // ==========================================
             VStack(spacing: 10) {
-                // الزر الرئيسي الكبير (توقيع وتثبيت / تثبيت)
+                // الزر الرئيسي الكبير
                 Button {
                     let impact = UIImpactFeedbackGenerator(style: .medium)
                     impact.impactOccurred()
@@ -111,60 +123,80 @@ struct LibraryCellView: View {
                 }
                 .buttonStyle(.borderless)
                 
-                // خيارات شبكية مصغرة لباقي العمليات
+                // خيارات شبكية مصغرة
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    Button {
-                        selectedSigningAppPresenting = AnyApp(base: app)
-                    } label: {
+                    Button { selectedSigningAppPresenting = AnyApp(base: app) } label: {
                         _miniOptionButton(title: "توقيع", icon: "signature", color: .blue)
                     }
                     
-                    Button {
-                        selectedInstallAppPresenting = AnyApp(base: app, archive: true)
-                    } label: {
+                    Button { selectedInstallAppPresenting = AnyApp(base: app, archive: true) } label: {
                         _miniOptionButton(title: "تصدير", icon: "square.and.arrow.up", color: .purple)
                     }
                     
-                    Button {
-                        selectedAppDylibsPresenting = AnyApp(base: app)
-                    } label: {
+                    Button { selectedAppDylibsPresenting = AnyApp(base: app) } label: {
                         _miniOptionButton(title: "مكتبات", icon: "building.columns", color: .cyan)
                     }
                     
-                    Button {
-                        Storage.shared.deleteApp(for: app)
-                    } label: {
+                    Button { Storage.shared.deleteApp(for: app) } label: {
                         _miniOptionButton(title: "حذف", icon: "trash", color: .red)
                     }
                 }
                 .buttonStyle(.borderless)
+                
+                // زر الرجوع الجديد (لإغلاق الكارت)
+                Button {
+                    toggleFlip()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.uturn.backward.circle.fill")
+                        Text("رجوع")
+                    }
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 4)
+                }
+                .buttonStyle(.borderless)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 170)
-            .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.95))
+            .frame(maxWidth: .infinity, minHeight: 180)
+            // جعل الخلفية قابلة للمس حتى ينقلب الكارت عند الضغط على أي فراغ
+            .background(
+                Color(UIColor.secondarySystemGroupedBackground).opacity(0.95)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        if isFlipped { toggleFlip() }
+                    }
+            )
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.1), lineWidth: 1))
-            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0)) // قلب العناصر بالخلف لتظهر صحيحة
-            .opacity(isFlipped ? 1.0 : 0.0) // إظهار الظهر فقط عند الانقلاب
+            .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
+            .opacity(isFlipped ? 1.0 : 0.0)
         }
-        // تأثيرات الدوران 3D على الكارت بالكامل
+        // تأثيرات الدوران 3D
         .rotation3DEffect(.degrees(degrees), axis: (x: 0, y: 1, z: 0))
-        .contentShape(Rectangle())
-        .onTapGesture {
-            if isEditing {
-                _toggleSelection()
-            } else {
-                // أنيميشن الانقلاب ثلاثي الأبعاد
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
-                    self.degrees += 180
-                    self.isFlipped.toggle()
-                }
-            }
-        }
         .scaleEffect(_isSelected ? 0.95 : 1.0)
     }
     
-    // ويدجت صغير للأزرار بالخلف
+    // MARK: - الدوال المساعدة
+    
+    // دالة مسؤولة عن قلب الكارت بانسيابية
+    private func toggleFlip() {
+        let impact = UIImpactFeedbackGenerator(style: .light)
+        impact.impactOccurred()
+        
+        withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
+            if isFlipped {
+                // العودة للخلف
+                self.degrees -= 180
+            } else {
+                // الدوران للأمام
+                self.degrees += 180
+            }
+            self.isFlipped.toggle()
+        }
+    }
+    
+    // تصميم الأزرار الصغيرة بالظهر
     @ViewBuilder
     private func _miniOptionButton(title: String, icon: String, color: Color) -> some View {
         VStack(spacing: 4) {
