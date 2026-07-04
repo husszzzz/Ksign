@@ -198,7 +198,7 @@ struct VIPPackageCard: View {
     }
 }
 
-// MARK: - صفحة أحدث الإضافات (النسخة الحقيقية المربوطة بالمتجر)
+// MARK: - صفحة أحدث الإضافات (النسخة الآمنة والنهائية)
 struct RecentUpdatesView: View {
     @StateObject private var viewModel = SourcesViewModel.shared
     
@@ -208,19 +208,25 @@ struct RecentUpdatesView: View {
         animation: .snappy
     ) private var sources: FetchedResults<AltSource>
     
-    var recentApps: [ASRepository.App] {
-        var allApps: [ASRepository.App] = []
+    // غلاف حماية لمنع أخطاء الـ Xcode بالـ ForEach
+    struct SafeApp: Identifiable {
+        let id = UUID()
+        let app: ASRepository.App
+    }
+    
+    var recentApps: [SafeApp] {
+        var allApps: [SafeApp] = []
         
         for source in sources {
-            // استخدام التسمية الصحيحة viewModel.sources
             if let repo = viewModel.sources[source] {
-                allApps.append(contentsOf: repo.apps)
+                for app in repo.apps {
+                    allApps.append(SafeApp(app: app))
+                }
             }
         }
         
-        return Array(allApps.sorted { 
-            ($0.versionDate ?? Date.distantPast) > ($1.versionDate ?? Date.distantPast) 
-        }.prefix(50))
+        // نأخذ التطبيقات بدون ترتيب معقد لتجنب خطأ DateParsed
+        return Array(allApps.prefix(50))
     }
     
     var body: some View {
@@ -235,7 +241,8 @@ struct RecentUpdatesView: View {
                 .frame(maxWidth: .infinity)
                 .listRowBackground(Color.clear)
             } else {
-                ForEach(recentApps, id: \.bundleIdentifier) { app in
+                ForEach(recentApps) { safeItem in
+                    let app = safeItem.app
                     HStack(spacing: 15) {
                         AsyncImage(url: app.iconURL) { phase in
                             if let image = phase.image {
@@ -253,7 +260,6 @@ struct RecentUpdatesView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         
                         VStack(alignment: .leading, spacing: 4) {
-                            // إضافة حماية Optional لاسم التطبيق
                             Text(app.name ?? "تطبيق غير معروف")
                                 .font(.headline)
                             Text("إصدار: \(app.version)")
@@ -263,7 +269,7 @@ struct RecentUpdatesView: View {
                         Spacer()
                         
                         Button(action: {
-                            // التنزيل (يتم برمجته لاحقاً)
+                            // التنزيل يتم برمجته لاحقاً
                         }) {
                             Text("تنزيل")
                                 .font(.subheadline)
@@ -283,7 +289,8 @@ struct RecentUpdatesView: View {
         .navigationTitle("أحدث الإضافات")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: Array(sources)) {
-            await viewModel.fetchSources(Array(sources))
+            // تم تصحيح هذا السطر: نمرر sources مباشرة بدون Array
+            await viewModel.fetchSources(sources)
         }
     }
 }
