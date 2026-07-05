@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters)
+//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters, App Count)
 //
 
 import SwiftUI
@@ -27,7 +27,7 @@ extension SourceAppsView {
         }
     }
     
-    // 1. إضافة الفلاتر (التصنيفات)
+    // الفلاتر (التصنيفات)
     enum AppCategory: String, CaseIterable {
         case all = "الكل"
         case apps = "تطبيقات"
@@ -43,8 +43,8 @@ struct SourceAppsView: View {
     
     @State private var _sortOption: SortOption = .default
     @State private var _selectedRoute: SourceAppRoute?
-    @State private var _selectedCategory: AppCategory = .all // متغير الفلتر النشط
-    @State private var isRefreshing = false // متغير لحركة زر التحديث
+    @State private var _selectedCategory: AppCategory = .all
+    @State private var isRefreshing = false
     
     @State var isLoading = true
     @State var hasLoadedOnce = false
@@ -52,7 +52,7 @@ struct SourceAppsView: View {
     var fromAppStore: Bool = false
     
     private var _navigationTitle: String {
-        return "App Store" // تم تثبيت الاسم لإخفاء أي معلومات إضافية
+        return "App Store" // تم تثبيت الاسم لإخفاء معلومات المتجر الأصلي
     }
     
     var object: [AltSource]
@@ -65,54 +65,66 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // 2. الفلترة الذكية (Smart Filtering)
+    // الفلترة الذكية (تم تبسيط الكود هنا لحل مشكلة توقف الـ Xcode)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
-        var all = [SourceAppRoute]()
+        var all: [SourceAppRoute] = []
+        
         for source in sources {
             for app in source.apps {
                 all.append(SourceAppRoute(source: source, app: app))
             }
         }
         
-        // فلتر البحث النصي
-        if !_searchText.isEmpty {
-            all = all.filter { ($0.app.name ?? "").localizedCaseInsensitiveContains(_searchText) }
+        let currentSearch = _searchText.lowercased()
+        if !currentSearch.isEmpty {
+            all = all.filter { route in
+                let appName = route.app.name ?? ""
+                return appName.lowercased().contains(currentSearch)
+            }
         }
         
-        // فلتر الأقسام الذكي
-        if _selectedCategory != .all {
+        let currentCategory = _selectedCategory
+        if currentCategory != .all {
+            // الكلمات المفتاحية الذكية للعزل
+            let gameKeywords = ["game", "pubg", "gta", "pes", "fifa", "لعب", "كود", "ببجي", "مهكر", "minecraft", "roblox", "car", "racing", "clash"]
+            let nationalKeywords = ["زين", "اسيا", "كورك", "وطني", "عراق", "iraq", "zain", "asia", "korek", "earthlink", "ايرثلنك", "شبكتي", "shabakaty", "cinemana", "سينمانا"]
+            
             all = all.filter { route in
                 let name = (route.app.name ?? "").lowercased()
                 let bundle = (route.app.bundleIdentifier ?? "").lowercased()
                 
-                // الكلمات المفتاحية للألعاب
-                let gameKeywords = ["game", "pubg", "gta", "pes", "fifa", "لعب", "كود", "ببجي", "مهكر", "minecraft", "roblox", "car", "racing", "clash"]
-                // الكلمات المفتاحية للتواصل الوطني
-                let nationalKeywords = ["زين", "اسيا", "كورك", "وطني", "عراق", "iraq", "zain", "asia", "korek", "earthlink", "ايرثلنك", "شبكتي", "shabakaty", "cinemana", "سينمانا"]
+                var isGame = false
+                var isNational = false
                 
-                let isGame = gameKeywords.contains(where: { name.contains($0) || bundle.contains($0) })
-                let isNational = nationalKeywords.contains(where: { name.contains($0) || bundle.contains($0) })
-                
-                switch _selectedCategory {
-                case .games: return isGame
-                case .national: return isNational
-                case .apps: return !isGame && !isNational
-                case .all: return true
+                for kw in gameKeywords {
+                    if name.contains(kw) || bundle.contains(kw) {
+                        isGame = true
+                        break
+                    }
                 }
+                
+                for kw in nationalKeywords {
+                    if name.contains(kw) || bundle.contains(kw) {
+                        isNational = true
+                        break
+                    }
+                }
+                
+                if currentCategory == .games { return isGame }
+                if currentCategory == .national { return isNational }
+                if currentCategory == .apps { return !isGame && !isNational }
+                return true
             }
         }
         
-        // ترتيب التطبيقات
+        let sortOpt = _sortOption
+        let asc = _sortAscending
         all.sort { a, b in
             let nameA = a.app.name ?? ""
             let nameB = b.app.name ?? ""
-            if _sortOption == .name {
-                return _sortAscending ? nameA < nameB : nameA > nameB
-            } else if _sortOption == .date {
-                let dateA = a.app.versionDate ?? Date.distantPast
-                let dateB = b.app.versionDate ?? Date.distantPast
-                return _sortAscending ? dateA > dateB : dateA < dateB // الأحدث أولاً
+            if sortOpt == .name {
+                return asc ? (nameA < nameB) : (nameA > nameB)
             }
             return true
         }
@@ -120,20 +132,32 @@ struct SourceAppsView: View {
         return all
     }
     
-    // MARK: Body
     var body: some View {
         ZStack {
-            if let _sources, !_sources.isEmpty {
+            if let sources = _sources, !sources.isEmpty {
                 ScrollView {
                     VStack(spacing: 16) {
                         
-                        // 3. زر التحديث الفخم الجديد
+                        // 1. زر التحديث الفخم
                         _refreshBanner()
                         
-                        // 4. كبسولات الفلاتر
+                        // 2. كبسولات الفلاتر
                         _categoryPills()
                         
-                        // 5. شبكة التطبيقات
+                        // 3. عداد التطبيقات الجديد
+                        HStack {
+                            Text("عدد التطبيقات المتاحة: \(_filteredApps.count)")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.purple)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(Color.purple.opacity(0.15))
+                                .clipShape(Capsule())
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        
+                        // 4. شبكة التطبيقات
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                             ForEach(_filteredApps, id: \.id) { route in
                                 Button(action: {
@@ -156,17 +180,15 @@ struct SourceAppsView: View {
                     } description: {
                         Text("جاري تحميل تطبيقات Hassany Store...")
                     }
+                } else {
+                    ProgressView()
                 }
-                else { ProgressView() }
             }
         }
         .navigationTitle(_navigationTitle)
         .searchable(text: $_searchText, placement: .platform())
-        // 🚫 تم حذف زر نسخ المصادر (toolbarTitleMenu) بالكامل لحماية المتجر
         .toolbar {
-            // 🚫 تم حذف زر "المصادر" (Sources) من الزاوية العلوية بالكامل
-            
-            // تم الإبقاء على قائمة الترتيب فقط وتغيير أيقونتها لتكون أجمل
+            // 🚫 تم حذف كود زر المصادر نهائياً لحماية المتجر
             NBToolbarMenu(
                 systemImage: "arrow.up.arrow.down.circle",
                 style: .icon,
@@ -214,7 +236,6 @@ struct SourceAppsView: View {
 // MARK: - Extension: View (UI Components)
 extension SourceAppsView {
     
-    // تصميم زر التحديث العريض (Banner)
     @ViewBuilder
     private func _refreshBanner() -> some View {
         Button(action: {
@@ -260,7 +281,6 @@ extension SourceAppsView {
         .buttonStyle(.plain)
     }
     
-    // تصميم كبسولات الفلاتر
     @ViewBuilder
     private func _categoryPills() -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -332,13 +352,12 @@ extension View {
     }
 }
 
-// MARK: - التصميم الجديد: كارت التطبيق
+// MARK: - App Card View
 struct AppCardView: View {
     let route: SourceAppsView.SourceAppRoute
     
     var body: some View {
         VStack(spacing: 12) {
-            // صورة التطبيق
             AsyncImage(url: route.app.iconURL) { phase in
                 if let image = phase.image {
                     image
@@ -356,21 +375,18 @@ struct AppCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             
-            // اسم التطبيق والإصدار - (تم إصلاح مشكلة كلمة Optional المزعجة)
             VStack(spacing: 4) {
                 Text(route.app.name ?? "Unknown App")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .foregroundColor(.primary)
                 
-                // هنا تم إصلاح الخلل: استخدمنا القيمة الافتراضية للتخلص من Optional
                 Text("v\(route.app.version ?? "1.0")")
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                     .foregroundColor(.secondary)
             }
             
-            // زر التثبيت
             Text("تثبيت")
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
