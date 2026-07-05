@@ -30,7 +30,7 @@ struct SourceAppsDetailView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             
-            // 1. الهيدر الفخم (أيقونة + معلومات أساسية + زر تثبيت)
+            // 1. الهيدر الفخم (أيقونة + معلوما أساسية + زر تثبيت)
             VStack(spacing: 20) {
                 HStack(alignment: .top, spacing: 16) {
                     // أيقونة التطبيق
