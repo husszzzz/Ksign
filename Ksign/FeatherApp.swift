@@ -3,6 +3,7 @@
 //  Feather
 //
 //  Created by samara on 10.04.2025.
+//  Modified for Hassany Store Theme (Purple & Dark Glass)
 //
 
 import SwiftUI
@@ -12,69 +13,106 @@ import IDeviceSwift
 
 @main
 struct FeatherApp: App {
-	@UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-	let heartbeat = HeartbeatManager.shared
-	@StateObject var downloadManager = DownloadManager.shared
-	@StateObject var accentColorManager = AccentColorManager.shared
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    let heartbeat = HeartbeatManager.shared
+    @StateObject var downloadManager = DownloadManager.shared
+    @StateObject var accentColorManager = AccentColorManager.shared
     @StateObject var extractManager = ExtractManager.shared
-	@StateObject var logsManager = LogsManager.shared
-	let storage = Storage.shared
+    @StateObject var logsManager = LogsManager.shared
+    let storage = Storage.shared
 
-	var body: some Scene {
-		WindowGroup {
-			VStack {
+    // ==========================================
+    // 🎨 محرك الثيم الشامل لمتجر Hassany Store
+    // ==========================================
+    init() {
+        // 1. إعدادات شريط التنقل (Navigation Bar) - أسود زجاجي مع بنفسجي
+        let navAppearance = UINavigationBarAppearance()
+        navAppearance.configureWithTransparentBackground()
+        navAppearance.backgroundColor = UIColor(white: 0.05, alpha: 0.9)
+        navAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        navAppearance.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navAppearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
+
+        UINavigationBar.appearance().standardAppearance = navAppearance
+        UINavigationBar.appearance().compactAppearance = navAppearance
+        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
+        UINavigationBar.appearance().tintColor = UIColor.systemPurple // أزرار الرجوع بالبنفسجي
+
+        // 2. إعدادات الشريط السفلي (Tab Bar) - تأثير زجاجي مع أيقونات بنفسجية
+        let tabAppearance = UITabBarAppearance()
+        tabAppearance.configureWithTransparentBackground()
+        tabAppearance.backgroundColor = UIColor(white: 0.05, alpha: 0.95)
+        tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterialDark)
+        
+        UITabBar.appearance().standardAppearance = tabAppearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = tabAppearance
+        }
+        UITabBar.appearance().tintColor = UIColor.systemPurple
+        UITabBar.appearance().unselectedItemTintColor = UIColor.gray
+        
+        // 3. فرض اللون البنفسجي على جميع عناصر النظام
+        UIView.appearance().tintColor = UIColor.systemPurple
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            VStack {
                 ExtractHeaderView(extractManager: extractManager)
                     .transition(.move(edge: .top).combined(with: .opacity))
-				DownloadHeaderView(downloadManager: downloadManager)
-					.transition(.move(edge: .top).combined(with: .opacity))
-				VariedTabbarView()
-					.environment(\.managedObjectContext, storage.context)
-					.onOpenURL(perform: _handleURL)
-					.transition(.move(edge: .top).combined(with: .opacity))
-			}
-            .preferredColorScheme(.dark) // إجبار التطبيق على الوضع الليلي
-			.animation(.smooth, value: downloadManager.manualDownloads.description)
+                DownloadHeaderView(downloadManager: downloadManager)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                VariedTabbarView()
+                    .environment(\.managedObjectContext, storage.context)
+                    .onOpenURL(perform: _handleURL)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            .preferredColorScheme(.dark) // إجبار التطبيق على الوضع الليلي الفخم
+            .tint(.purple) // فرض اللون البنفسجي في SwiftUI
+            .animation(.smooth, value: downloadManager.manualDownloads.description)
             .animation(.smooth, value: extractManager.extractItems.description)
-			.onReceive(accentColorManager.objectWillChange) { _ in
-				accentColorManager.updateGlobalTintColor()
-			}
-			.onAppear {
-				accentColorManager.updateGlobalTintColor()
-				if logsManager.isCapturing { logsManager.startCapture() }
-			}
-		}
-	}
-	
-	private func _handleURL(_ url: URL) {
-		if url.scheme == "ksign" {
-			if let fullPath = url.validatedScheme(after: "/source/") {
-				FR.handleSource(fullPath) { }
-			}
-			
-			if
-				let fullPath = url.validatedScheme(after: "/install/"),
-				let downloadURL = URL(string: fullPath)
-			{
-				_ = DownloadManager.shared.startDownload(from: downloadURL, id: "FeatherManualDownload_\(UUID().uuidString)")
-			}
-		} else {
-			if url.pathExtension == "ipa" || url.pathExtension == "tipa" {
-				if FileManager.default.isFileFromFileProvider(at: url) {
-					guard url.startAccessingSecurityScopedResource() else { return }
-					FR.handlePackageFile(url) { _ in }
-				} else {
-					FR.handlePackageFile(url) { _ in }
-				}
-				
-				return
-			}
-			
+            .onReceive(accentColorManager.objectWillChange) { _ in
+                // تجميد ألوان Ksign القديمة وفرض ثيم المتجر
+                UIView.appearance().tintColor = UIColor.systemPurple
+            }
+            .onAppear {
+                // تجميد ألوان Ksign القديمة وفرض ثيم المتجر بمجرد الفتح
+                UIView.appearance().tintColor = UIColor.systemPurple
+                if logsManager.isCapturing { logsManager.startCapture() }
+            }
+        }
+    }
+    
+    private func _handleURL(_ url: URL) {
+        if url.scheme == "ksign" {
+            if let fullPath = url.validatedScheme(after: "/source/") {
+                FR.handleSource(fullPath) { }
+            }
+            
+            if
+                let fullPath = url.validatedScheme(after: "/install/"),
+                let downloadURL = URL(string: fullPath)
+            {
+                _ = DownloadManager.shared.startDownload(from: downloadURL, id: "FeatherManualDownload_\(UUID().uuidString)")
+            }
+        } else {
+            if url.pathExtension == "ipa" || url.pathExtension == "tipa" {
+                if FileManager.default.isFileFromFileProvider(at: url) {
+                    guard url.startAccessingSecurityScopedResource() else { return }
+                    FR.handlePackageFile(url) { _ in }
+                } else {
+                    FR.handlePackageFile(url) { _ in }
+                }
+                
+                return
+            }
+            
             if url.pathExtension == "ksign" {
                 UIAlertController.showAlertWithOk(title: .localized("Error"), message: .localized("Ksign certificate file (.ksign) is now unsupported from v1.5.1, please refer to use .p12 and .mobileprovision instead."))
             }
-		}
-	}
-	
+        }
+    }
+    
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
