@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 22.04.2025.
-//  Modified for Hassany Store Theme (Premium Glass & Animated Progress Ring)
+//  Modified for Hassany Store Theme (Premium Glass & Animated Progress Ring - iOS 15+ Compatible)
 //
 
 import SwiftUI
@@ -76,7 +76,7 @@ struct InstallPreviewView: View {
             .padding(.top, 20)
             
             // ==========================================
-            // 2. حالة التحميل والنصوص (متحركة)
+            // 2. حالة التحميل والنصوص (متحركة ومتوافقة مع كل الأجهزة)
             // ==========================================
             VStack(spacing: 8) {
                 Text(app.name ?? "جاري التجهيز...")
@@ -84,10 +84,17 @@ struct InstallPreviewView: View {
                     .foregroundColor(.white)
                 
                 HStack(spacing: 6) {
-                    Image(systemName: viewModel.statusImage)
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.purple)
-                        .symbolEffect(.pulse, options: .repeating, isActive: viewModel.installProgress < 1.0)
+                    // التعديل لحل مشكلة البناء والتوافق مع الأجهزة القديمة
+                    if #available(iOS 17.0, *) {
+                        Image(systemName: viewModel.statusImage)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.purple)
+                            .symbolEffect(.pulse, options: .repeating, isActive: viewModel.installProgress < 1.0)
+                    } else {
+                        Image(systemName: viewModel.statusImage)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.purple)
+                    }
                     
                     Text(viewModel.statusLabel)
                         .font(.subheadline)
