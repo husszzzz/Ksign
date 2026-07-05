@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters, App Count)
+//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters, App Count - Fixed)
 //
 
 import SwiftUI
@@ -65,7 +65,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // الفلترة الذكية (تم تبسيط الكود هنا لحل مشكلة توقف الـ Xcode)
+    // الفلترة الذكية (تم حل مشكلة الـ Xcode بالاعتماد على الاسم فقط)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
@@ -92,20 +92,19 @@ struct SourceAppsView: View {
             
             all = all.filter { route in
                 let name = (route.app.name ?? "").lowercased()
-                let bundle = (route.app.bundleIdentifier ?? "").lowercased()
                 
                 var isGame = false
                 var isNational = false
                 
                 for kw in gameKeywords {
-                    if name.contains(kw) || bundle.contains(kw) {
+                    if name.contains(kw) {
                         isGame = true
                         break
                     }
                 }
                 
                 for kw in nationalKeywords {
-                    if name.contains(kw) || bundle.contains(kw) {
+                    if name.contains(kw) {
                         isNational = true
                         break
                     }
@@ -178,7 +177,7 @@ struct SourceAppsView: View {
                         ProgressView()
                         Label(.localized("Fetching..."), systemImage: "")
                     } description: {
-                        Text("جاري تحميل تطبيقات Hassany Store...")
+                        Text("جاري تحميل تطبيقات المتجر...")
                     }
                 } else {
                     ProgressView()
