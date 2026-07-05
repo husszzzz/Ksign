@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Grid UI)
+//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters)
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ import AltSourceKit
 import NimbleViews
 import UIKit
 
-// MARK: - Extension: View (Enil)
+// MARK: - Extension: View (Sort & Categories)
 extension SourceAppsView {
     enum SortOption: String, CaseIterable {
         case `default` = "default"
@@ -20,11 +20,19 @@ extension SourceAppsView {
         
         var displayName: String {
             switch self {
-            case .default:  .localized("Default")
-            case .name:     .localized("Name")
-            case .date:     .localized("Date")
+            case .default: return .localized("Default")
+            case .name:    return .localized("Name")
+            case .date:    return .localized("Date")
             }
         }
+    }
+    
+    // 1. إضافة الفلاتر (التصنيفات)
+    enum AppCategory: String, CaseIterable {
+        case all = "الكل"
+        case apps = "تطبيقات"
+        case games = "ألعاب"
+        case national = "تواصل وطني"
     }
 }
 
@@ -35,6 +43,8 @@ struct SourceAppsView: View {
     
     @State private var _sortOption: SortOption = .default
     @State private var _selectedRoute: SourceAppRoute?
+    @State private var _selectedCategory: AppCategory = .all // متغير الفلتر النشط
+    @State private var isRefreshing = false // متغير لحركة زر التحديث
     
     @State var isLoading = true
     @State var hasLoadedOnce = false
@@ -42,13 +52,7 @@ struct SourceAppsView: View {
     var fromAppStore: Bool = false
     
     private var _navigationTitle: String {
-        if fromAppStore {
-            return .localized("App Store")
-        } else if object.count == 1 {
-            return object[0].name ?? .localized("Unknown")
-        } else {
-            return .localized("%lld Sources", arguments: object.count)
-        }
+        return "App Store" // تم تثبيت الاسم لإخفاء أي معلومات إضافية
     }
     
     var object: [AltSource]
@@ -61,7 +65,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // فلترة التطبيقات للبحث والشبكة (Grid) - تم التعديل هنا للتعامل مع الـ Optional
+    // 2. الفلترة الذكية (Smart Filtering)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all = [SourceAppRoute]()
@@ -71,9 +75,48 @@ struct SourceAppsView: View {
             }
         }
         
+        // فلتر البحث النصي
         if !_searchText.isEmpty {
             all = all.filter { ($0.app.name ?? "").localizedCaseInsensitiveContains(_searchText) }
         }
+        
+        // فلتر الأقسام الذكي
+        if _selectedCategory != .all {
+            all = all.filter { route in
+                let name = (route.app.name ?? "").lowercased()
+                let bundle = (route.app.bundleIdentifier ?? "").lowercased()
+                
+                // الكلمات المفتاحية للألعاب
+                let gameKeywords = ["game", "pubg", "gta", "pes", "fifa", "لعب", "كود", "ببجي", "مهكر", "minecraft", "roblox", "car", "racing", "clash"]
+                // الكلمات المفتاحية للتواصل الوطني
+                let nationalKeywords = ["زين", "اسيا", "كورك", "وطني", "عراق", "iraq", "zain", "asia", "korek", "earthlink", "ايرثلنك", "شبكتي", "shabakaty", "cinemana", "سينمانا"]
+                
+                let isGame = gameKeywords.contains(where: { name.contains($0) || bundle.contains($0) })
+                let isNational = nationalKeywords.contains(where: { name.contains($0) || bundle.contains($0) })
+                
+                switch _selectedCategory {
+                case .games: return isGame
+                case .national: return isNational
+                case .apps: return !isGame && !isNational
+                case .all: return true
+                }
+            }
+        }
+        
+        // ترتيب التطبيقات
+        all.sort { a, b in
+            let nameA = a.app.name ?? ""
+            let nameB = b.app.name ?? ""
+            if _sortOption == .name {
+                return _sortAscending ? nameA < nameB : nameA > nameB
+            } else if _sortOption == .date {
+                let dateA = a.app.versionDate ?? Date.distantPast
+                let dateB = b.app.versionDate ?? Date.distantPast
+                return _sortAscending ? dateA > dateB : dateA < dateB // الأحدث أولاً
+            }
+            return true
+        }
+        
         return all
     }
     
@@ -81,19 +124,29 @@ struct SourceAppsView: View {
     var body: some View {
         ZStack {
             if let _sources, !_sources.isEmpty {
-                // التصميم الجديد: نظام الكارتات (Grid)
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
-                        ForEach(_filteredApps, id: \.id) { route in
-                            Button(action: {
-                                self._selectedRoute = route
-                            }) {
-                                AppCardView(route: route)
+                    VStack(spacing: 16) {
+                        
+                        // 3. زر التحديث الفخم الجديد
+                        _refreshBanner()
+                        
+                        // 4. كبسولات الفلاتر
+                        _categoryPills()
+                        
+                        // 5. شبكة التطبيقات
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                            ForEach(_filteredApps, id: \.id) { route in
+                                Button(action: {
+                                    self._selectedRoute = route
+                                }) {
+                                    AppCardView(route: route)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 20)
                     }
-                    .padding(16)
                 }
             } else {
                 if #available(iOS 17, *) {
@@ -101,7 +154,7 @@ struct SourceAppsView: View {
                         ProgressView()
                         Label(.localized("Fetching..."), systemImage: "")
                     } description: {
-                        Text(.localized("Stuck? Check if you have any sources added."))
+                        Text("جاري تحميل تطبيقات Hassany Store...")
                     }
                 }
                 else { ProgressView() }
@@ -109,50 +162,13 @@ struct SourceAppsView: View {
         }
         .navigationTitle(_navigationTitle)
         .searchable(text: $_searchText, placement: .platform())
-        .toolbarTitleMenu {
-            if let _sources, _sources.count == 1 {
-                if let url = _sources[0].website {
-                    Button(.localized("Visit Website"), systemImage: "globe") {
-                        UIApplication.open(url)
-                    }
-                }
-                if let url = _sources[0].patreonURL {
-                    Button(.localized("Visit Patreon"), systemImage: "dollarsign.circle") {
-                        UIApplication.open(url)
-                    }
-                }
-            }
-            Divider()
-            Button(.localized("Copy"), systemImage: "doc.on.doc") {
-                UIPasteboard.general.string = object.map {
-                    $0.sourceURL!.absoluteString
-                }.joined(separator: "\n")
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-            }
-        }
+        // 🚫 تم حذف زر نسخ المصادر (toolbarTitleMenu) بالكامل لحماية المتجر
         .toolbar {
-            if fromAppStore {
-                ToolbarItem(placement: .topBarLeading) {
-                    NavigationLink {
-                        SourcesView()
-                    } label: {
-                        Text(.localized("Sources"))
-                    }
-                }
-            }
+            // 🚫 تم حذف زر "المصادر" (Sources) من الزاوية العلوية بالكامل
             
-            NBToolbarButton(
-                systemImage: "arrow.trianglehead.2.counterclockwise.rotate.90",
-                style: .icon,
-                placement: .topBarTrailing
-            ) {
-                Task {
-                    await viewModel.fetchSources(_allSources, refresh: true)
-                }
-            }
-            
+            // تم الإبقاء على قائمة الترتيب فقط وتغيير أيقونتها لتكون أجمل
             NBToolbarMenu(
-                systemImage: "line.3.horizontal.decrease",
+                systemImage: "arrow.up.arrow.down.circle",
                 style: .icon,
                 placement: .topBarTrailing
             ) {
@@ -195,31 +211,107 @@ struct SourceAppsView: View {
     }
 }
 
-// MARK: - Extension: View (Sort)
+// MARK: - Extension: View (UI Components)
 extension SourceAppsView {
+    
+    // تصميم زر التحديث العريض (Banner)
     @ViewBuilder
-    private func _sortActions() -> some View {
-        Section(.localized("Filter by")) {
-            ForEach(SortOption.allCases, id: \.displayName) { opt in
-                _sortButton(for: opt)
+    private func _refreshBanner() -> some View {
+        Button(action: {
+            isRefreshing = true
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+            Task {
+                await viewModel.fetchSources(_allSources, refresh: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    isRefreshing = false
+                }
             }
+        }) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.purple)
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                    .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("تحديث المتجر")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("اضغط لتحديث التطبيقات وإضافة الجديد")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.gray)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.gray.opacity(0.5))
+            }
+            .padding(16)
+            .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.8))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.purple.opacity(0.2), lineWidth: 1))
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
         }
+        .buttonStyle(.plain)
     }
     
-    private func _sortButton(for option: SortOption) -> some View {
-        Button {
-            if _sortOption == option {
-                _sortAscending.toggle()
-            } else {
-                _sortOption = option
-                _sortAscending = true
+    // تصميم كبسولات الفلاتر
+    @ViewBuilder
+    private func _categoryPills() -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(AppCategory.allCases, id: \.self) { category in
+                    Button(action: {
+                        let impact = UISelectionFeedbackGenerator()
+                        impact.selectionChanged()
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                            _selectedCategory = category
+                        }
+                    }) {
+                        Text(category.rawValue)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(_selectedCategory == category ? .white : .gray)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                _selectedCategory == category 
+                                ? Color.purple 
+                                : Color(UIColor.secondarySystemGroupedBackground)
+                            )
+                            .clipShape(Capsule())
+                            .shadow(color: _selectedCategory == category ? .purple.opacity(0.4) : .clear, radius: 4, x: 0, y: 2)
+                    }
+                }
             }
-        } label: {
-            HStack {
-                Text(option.displayName)
-                Spacer()
-                if _sortOption == option {
-                    Image(systemName: _sortAscending ? "chevron.up" : "chevron.down")
+            .padding(.horizontal, 16)
+            .padding(.bottom, 4)
+        }
+    }
+
+    @ViewBuilder
+    private func _sortActions() -> some View {
+        Section("ترتيب حسب") {
+            ForEach(SortOption.allCases, id: \.displayName) { opt in
+                Button {
+                    if _sortOption == opt {
+                        _sortAscending.toggle()
+                    } else {
+                        _sortOption = opt
+                        _sortAscending = true
+                    }
+                } label: {
+                    HStack {
+                        Text(opt.displayName)
+                        Spacer()
+                        if _sortOption == opt {
+                            Image(systemName: _sortAscending ? "chevron.up" : "chevron.down")
+                        }
+                    }
                 }
             }
         }
@@ -264,14 +356,15 @@ struct AppCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             
-            // اسم التطبيق والإصدار - تم التعديل هنا للتعامل مع الـ Optional
+            // اسم التطبيق والإصدار - (تم إصلاح مشكلة كلمة Optional المزعجة)
             VStack(spacing: 4) {
                 Text(route.app.name ?? "Unknown App")
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .foregroundColor(.primary)
                 
-                Text("v\(route.app.version)")
+                // هنا تم إصلاح الخلل: استخدمنا القيمة الافتراضية للتخلص من Optional
+                Text("v\(route.app.version ?? "1.0")")
                     .font(.system(size: 12, weight: .medium))
                     .lineLimit(1)
                     .foregroundColor(.secondary)
@@ -283,12 +376,20 @@ struct AppCardView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(Color.accentColor) // يأخذ اللون الأساسي لمتجرك
+                .background(
+                    LinearGradient(
+                        gradient: Gradient(colors: [Color.purple, Color(red: 0.4, green: 0.1, blue: 0.7)]),
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
                 .clipShape(Capsule())
+                .shadow(color: .purple.opacity(0.3), radius: 3, x: 0, y: 2)
         }
         .padding(12)
-        .background(Color(UIColor.secondarySystemGroupedBackground))
+        .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.8))
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.purple.opacity(0.1), lineWidth: 1))
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
     }
 }
