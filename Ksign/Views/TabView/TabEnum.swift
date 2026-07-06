@@ -3,8 +3,8 @@ import NimbleViews
 import UniformTypeIdentifiers
 
 enum TabEnum: String, CaseIterable, Hashable {
-    case home         // 1. ضفنا قسم الرئيسية
-    case library      // 2. هذا هو قسم التوقيع الحقيقي (LibraryView)
+    case home         // 1. الرئيسية
+    case library      // 2. التوقيع
     case appstore     // 3. متجر التطبيقات
     case settings     // 4. الإعدادات
     
@@ -16,9 +16,9 @@ enum TabEnum: String, CaseIterable, Hashable {
     var title: String {
         switch self {
         case .home:         return "الرئيسية"
-        case .library:      return "التوقيع" // غيرنا اسمه للتوقيع
+        case .library:      return "التوقيع"
         case .appstore:     return "متجر التطبيقات" 
-        case .settings:     return .localized("Settings")
+        case .settings:     return "الإعدادات"
         case .files:        return .localized("Files")
         case .sources:      return .localized("Sources")
         case .certificates: return .localized("Certificates")
@@ -27,10 +27,11 @@ enum TabEnum: String, CaseIterable, Hashable {
     
     var icon: String {
         switch self {
-        case .home:         return "house.fill" // أيقونة البيت للرئيسية
-        case .library:      return "signature"  // أيقونة التوقيع
-        case .appstore:     return "plus.app.fill"
-        case .settings:     return "gearshape.2"
+        // أيقونات عصرية وفخمة (Apple SF Symbols الحديثة)
+        case .home:         return "house.fill"                  // بيت عصري وممتلئ
+        case .library:      return "seal.fill"                   // أيقونة ختم التوثيق (تليق بالتوقيع)
+        case .appstore:     return "square.stack.3d.up.fill"     // أيقونة 3D فخمة للمتجر
+        case .settings:     return "slider.horizontal.3"         // أيقونة سلايدر احترافية للإعدادات
         case .files:        return "folder.fill"
         case .sources:      return "globe.desk"
         case .certificates: return "person.text.rectangle"
@@ -40,8 +41,8 @@ enum TabEnum: String, CaseIterable, Hashable {
     @ViewBuilder
     static func view(for tab: TabEnum) -> some View {
         switch tab {
-        case .home: HomeView() // استدعاء واجهة الرئيسية الجديدة اللي صممناها
-        case .library: LibraryView() // استدعاء التوقيع الحقيقي (اللي برمجناه قبل شوية)
+        case .home: HomeView() 
+        case .library: LibraryView() 
         case .appstore: AppstoreView()
         case .settings: SettingsView()
         case .files: FilesView()
@@ -50,13 +51,13 @@ enum TabEnum: String, CaseIterable, Hashable {
         }
     }
     
-    // ترتيب الأزرار بالشريط السفلي (من اليسار لليمين أو حسب لغة الجهاز)
+    // ترتيب الأزرار بالشريط السفلي
     static var defaultTabs: [TabEnum] {
         return [
-            .home,      // الرئيسية راح تكون أول وحدة تفتح
-            .library,   // بعدها قسم التوقيع
-            .appstore,  // بعدها المتجر
-            .settings   // وأخيراً الإعدادات
+            .home,      // تفتح الرئيسية أولاً
+            .library,
+            .appstore,
+            .settings
         ]
     }
     
