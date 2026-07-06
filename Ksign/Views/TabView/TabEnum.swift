@@ -3,12 +3,11 @@ import NimbleViews
 import UniformTypeIdentifiers
 
 enum TabEnum: String, CaseIterable, Hashable {
-    case home         // 1. الرئيسية
-    case library      // 2. التوقيع
-    case appstore     // 3. متجر التطبيقات
-    case settings     // 4. الإعدادات
+    case home         
+    case library      
+    case appstore     
+    case settings     
     
-    // الأقسام الإضافية
     case files
     case sources
     case certificates
@@ -27,11 +26,10 @@ enum TabEnum: String, CaseIterable, Hashable {
     
     var icon: String {
         switch self {
-        // أيقونات عصرية وفخمة (Apple SF Symbols الحديثة)
-        case .home:         return "house.fill"                  // بيت عصري وممتلئ
-        case .library:      return "seal.fill"                   // أيقونة ختم التوثيق (تليق بالتوقيع)
-        case .appstore:     return "square.stack.3d.up.fill"     // أيقونة 3D فخمة للمتجر
-        case .settings:     return "slider.horizontal.3"         // أيقونة سلايدر احترافية للإعدادات
+        case .home:         return "house.fill"
+        case .library:      return "signature" // تم تغيير الأيقونة إلى القلم والدائرة (نفس طلبك)
+        case .appstore:     return "square.stack.3d.up.fill"
+        case .settings:     return "slider.horizontal.3"
         case .files:        return "folder.fill"
         case .sources:      return "globe.desk"
         case .certificates: return "person.text.rectangle"
@@ -51,10 +49,9 @@ enum TabEnum: String, CaseIterable, Hashable {
         }
     }
     
-    // ترتيب الأزرار بالشريط السفلي
     static var defaultTabs: [TabEnum] {
         return [
-            .home,      // تفتح الرئيسية أولاً
+            .home,      
             .library,
             .appstore,
             .settings
