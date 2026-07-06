@@ -1,9 +1,9 @@
 //
-//  ContentView.swift
+//  LibraryView.swift
 //  Feather
 //
 //  Created by samara on 10.04.2025.
-//  Modified for Hassany Store Theme (One-Click Auto-Sign Receiver)
+//  Modified for Hassany Store (Smart Auto-Sign Radar & Crash-Free)
 //
 
 import SwiftUI
@@ -23,18 +23,17 @@ struct LibraryView: View {
     @State private var _isImportingPresenting = false
     @State private var _isDownloadingPresenting = false
 
-    @State private var _alertDownloadString: String = "" // for _isDownloadingPresenting
+    @State private var _alertDownloadString: String = ""
     @State private var _searchText = ""
-    @State private var _selectedTab: Int = 0 // 0 for Downloaded, 1 for Signed
+    @State private var _selectedTab: Int = 0 
     
     // MARK: Edit Mode
     @State private var _isEditMode: EditMode = .inactive
     @State private var _selectedApps: Set<String> = []
     
     @Namespace private var _namespace
-    @Namespace private var _tabNamespace // مساحة أسماء خاصة لحركة الأزرار الكبسولية
+    @Namespace private var _tabNamespace 
     
-    // horror
     private func filteredAndSortedApps<T>(from apps: FetchedResults<T>) -> [T] where T: NSManagedObject {
         apps.filter {
             _searchText.isEmpty ||
@@ -68,112 +67,47 @@ struct LibraryView: View {
         NBNavigationView(.localized("Library")) {
             VStack(spacing: 0) {
                 
-                // ==========================================
-                // 1. شريط البحث العائم الفخم
-                // ==========================================
+                // 1. شريط البحث
                 HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(.purple.opacity(0.8))
-                    
-                    TextField("بحث في المكتبة...", text: $_searchText)
-                        .foregroundColor(.white)
-                        .accentColor(.purple)
-                        .autocapitalization(.none)
-                        .disableAutocorrection(true)
-                    
+                    Image(systemName: "magnifyingglass").font(.system(size: 16, weight: .semibold)).foregroundColor(.purple.opacity(0.8))
+                    TextField("بحث في المكتبة...", text: $_searchText).foregroundColor(.white).accentColor(.purple).autocapitalization(.none).disableAutocorrection(true)
                     if !_searchText.isEmpty {
-                        Button(action: {
-                            withAnimation(.spring()) {
-                                _searchText = ""
-                            }
-                        }) {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.gray.opacity(0.6))
+                        Button(action: { withAnimation(.spring()) { _searchText = "" } }) {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.gray.opacity(0.6))
                         }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.95))
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.purple.opacity(_searchText.isEmpty ? 0.05 : 0.5), lineWidth: 1.5)
-                )
-                .padding(.horizontal)
-                .padding(.top, 10)
+                .padding(.horizontal, 16).padding(.vertical, 12).background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.95)).clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous)).overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Color.purple.opacity(_searchText.isEmpty ? 0.05 : 0.5), lineWidth: 1.5)).padding(.horizontal).padding(.top, 10)
                 
-                // ==========================================
-                // 2. أزرار التبديل الكبسولية
-                // ==========================================
+                // 2. أزرار التبديل
                 HStack(spacing: 0) {
                     ForEach([0, 1], id: \.self) { index in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                                _selectedTab = index
-                            }
-                        }) {
+                        Button(action: { withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { _selectedTab = index } }) {
                             Text(index == 0 ? "التطبيقات التي تم تنزيلها" : "التطبيقات الموقعة")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(_selectedTab == index ? .white : .gray)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(
-                                    ZStack {
-                                        if _selectedTab == index {
-                                            Capsule()
-                                                .fill(Color.purple)
-                                                .shadow(color: .purple.opacity(0.4), radius: 4, x: 0, y: 2)
-                                                .matchedGeometryEffect(id: "TAB_INDICATOR", in: _tabNamespace)
-                                        }
-                                    }
-                                )
+                                .background(ZStack { if _selectedTab == index { Capsule().fill(Color.purple).shadow(color: .purple.opacity(0.4), radius: 4, x: 0, y: 2).matchedGeometryEffect(id: "TAB_INDICATOR", in: _tabNamespace) } })
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
                 }
-                .padding(4)
-                .background(Color(UIColor.tertiarySystemGroupedBackground))
-                .clipShape(Capsule())
-                .padding(.horizontal)
-                .padding(.vertical, 12)
+                .padding(4).background(Color(UIColor.tertiarySystemGroupedBackground)).clipShape(Capsule()).padding(.horizontal).padding(.vertical, 12)
                 
-                // ==========================================
-                // 3. قائمة التطبيقات (المكتبة)
-                // ==========================================
+                // 3. قائمة التطبيقات
                 NBListAdaptable {
                     if _selectedTab == 0 {
-                        NBSection(
-                            .localized("Downloaded Apps"),
-                            secondary: _filteredImportedApps.count.description
-                        ) {
+                        NBSection(.localized("Downloaded Apps"), secondary: _filteredImportedApps.count.description) {
                             ForEach(_filteredImportedApps, id: \.uuid) { app in
-                                LibraryCellView(
-                                    app: app,
-                                    selectedInfoAppPresenting: $_selectedInfoAppPresenting,
-                                    selectedSigningAppPresenting: $_selectedSigningAppPresenting,
-                                    selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-                                    selectedAppDylibsPresenting: $_selectedAppDylibsPresenting,
-                                    selectedApps: $_selectedApps
-                                )
+                                LibraryCellView(app: app, selectedInfoAppPresenting: $_selectedInfoAppPresenting, selectedSigningAppPresenting: $_selectedSigningAppPresenting, selectedInstallAppPresenting: $_selectedInstallAppPresenting, selectedAppDylibsPresenting: $_selectedAppDylibsPresenting, selectedApps: $_selectedApps)
                                 .compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
                             }
                         }
                     } else {
-                        NBSection(
-                            .localized("Signed Apps"),
-                            secondary: _filteredSignedApps.count.description
-                        ) {
+                        NBSection(.localized("Signed Apps"), secondary: _filteredSignedApps.count.description) {
                             ForEach(_filteredSignedApps, id: \.uuid) { app in
-                                LibraryCellView(
-                                    app: app,
-                                    selectedInfoAppPresenting: $_selectedInfoAppPresenting,
-                                    selectedSigningAppPresenting: $_selectedSigningAppPresenting,
-                                    selectedInstallAppPresenting: $_selectedInstallAppPresenting,
-                                    selectedAppDylibsPresenting: $_selectedAppDylibsPresenting,
-                                    selectedApps: $_selectedApps
-                                )
+                                LibraryCellView(app: app, selectedInfoAppPresenting: $_selectedInfoAppPresenting, selectedSigningAppPresenting: $_selectedSigningAppPresenting, selectedInstallAppPresenting: $_selectedInstallAppPresenting, selectedAppDylibsPresenting: $_selectedAppDylibsPresenting, selectedApps: $_selectedApps)
                                 .compatMatchedTransitionSource(id: app.uuid ?? "", ns: _namespace)
                             }
                         }
@@ -183,194 +117,105 @@ struct LibraryView: View {
             .overlay {
                 if _filteredSignedApps.isEmpty && _filteredImportedApps.isEmpty {
                     VStack(spacing: 16) {
-                        Image(systemName: "signature")
-                            .font(.system(size: 60, weight: .light))
-                            .foregroundColor(.gray)
-                            .overlay(
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 22, weight: .bold))
-                                    .foregroundColor(.purple) 
-                                    .offset(x: 25, y: 15)
-                            )
-                            .padding(.bottom, 8)
-                        
-                        Text(.localized("No Apps"))
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text(.localized("Get started by importing your first IPA file."))
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 30)
-                        
-                        Button {
-                            _isImportingPresenting = true
-                        } label: {
-                            Text(.localized("Import from Files"))
-                                .font(.headline)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 24)
-                                .padding(.vertical, 12)
-                                .background(
-                                    LinearGradient(
-                                        gradient: Gradient(colors: [Color.purple, Color(red: 0.4, green: 0.1, blue: 0.7)]),
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .clipShape(Capsule())
-                                .shadow(color: .purple.opacity(0.4), radius: 6, x: 0, y: 3)
-                        }
-                        .padding(.top, 10)
+                        Image(systemName: "signature").font(.system(size: 60, weight: .light)).foregroundColor(.gray).overlay(Image(systemName: "xmark").font(.system(size: 22, weight: .bold)).foregroundColor(.purple).offset(x: 25, y: 15)).padding(.bottom, 8)
+                        Text(.localized("No Apps")).font(.title2).fontWeight(.bold)
+                        Text(.localized("Get started by importing your first IPA file.")).font(.subheadline).foregroundColor(.gray).multilineTextAlignment(.center).padding(.horizontal, 30)
+                        Button { _isImportingPresenting = true } label: {
+                            Text(.localized("Import from Files")).font(.headline).foregroundColor(.white).padding(.horizontal, 24).padding(.vertical, 12).background(LinearGradient(gradient: Gradient(colors: [Color.purple, Color(red: 0.4, green: 0.1, blue: 0.7)]), startPoint: .topLeading, endPoint: .bottomTrailing)).clipShape(Capsule()).shadow(color: .purple.opacity(0.4), radius: 6, x: 0, y: 3)
+                        }.padding(.top, 10)
                     }
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
-                }
+                ToolbarItem(placement: .topBarLeading) { EditButton() }
                 if _isEditMode.isEditing {
                     ToolbarItemGroup(placement: .topBarTrailing) {
                         if _selectedTab == 0 {
-                            Button {
-                                _isBulkSigningPresenting = true
-                            } label: {
-                                NBButton(.localized("Sign"), systemImage: "signature", style: .icon)
-                            }
-                            .disabled(_selectedApps.isEmpty)
+                            Button { _isBulkSigningPresenting = true } label: { NBButton(.localized("Sign"), systemImage: "signature", style: .icon) }.disabled(_selectedApps.isEmpty)
                         } else {
-                            Button {
-                                _isBulkInstallingPresenting = true
-                            } label: {
-                                NBButton(.localized("Install"), systemImage: "square.and.arrow.down")
-                            }
-                            .disabled(_selectedApps.isEmpty)
+                            Button { _isBulkInstallingPresenting = true } label: { NBButton(.localized("Install"), systemImage: "square.and.arrow.down") }.disabled(_selectedApps.isEmpty)
                         }
-                        Button {
-                            _bulkDeleteSelectedApps()
-                        } label: {
-                            NBButton(.localized("Delete"), systemImage: "trash", style: .icon)
-                        }
-                        .disabled(_selectedApps.isEmpty)
+                        Button { _bulkDeleteSelectedApps() } label: { NBButton(.localized("Delete"), systemImage: "trash", style: .icon) }.disabled(_selectedApps.isEmpty)
                     }
                 } else {
                     ToolbarItemGroup(placement: .topBarTrailing) {
-                        Button {
-                            _isDownloadingPresenting = true
-                        } label: {
-                            Image(systemName: "link")
-                                .font(.system(size: 16, weight: .medium))
-                        }
-                        
-                        Button {
-                            _isImportingPresenting = true
-                        } label: {
-                            Image(systemName: "folder.badge.plus")
-                                .font(.system(size: 16, weight: .medium))
-                        }
+                        Button { _isDownloadingPresenting = true } label: { Image(systemName: "link").font(.system(size: 16, weight: .medium)) }
+                        Button { _isImportingPresenting = true } label: { Image(systemName: "folder.badge.plus").font(.system(size: 16, weight: .medium)) }
                     }
                 }
             }
             .environment(\.editMode, $_isEditMode)
-            .sheet(item: $_selectedInfoAppPresenting) { app in
-                LibraryInfoView(app: app.base)
-            }
-            .sheet(item: $_selectedInstallAppPresenting) { app in
-                InstallPreviewView(app: app.base, isSharing: app.archive)
-                    .presentationDetents([.height(200)])
-                    .presentationDragIndicator(.visible)
-            }
-            .fullScreenCover(item: $_selectedSigningAppPresenting) { app in
-                SigningView(app: app.base, signAndInstall: app.signAndInstall)
-                    .compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace)
-            }
-            .fullScreenCover(item: $_selectedAppDylibsPresenting) { app in
-                DylibsView(app: app.base)
-                    .compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace)
-            }
+            .sheet(item: $_selectedInfoAppPresenting) { app in LibraryInfoView(app: app.base) }
+            .sheet(item: $_selectedInstallAppPresenting) { app in InstallPreviewView(app: app.base, isSharing: app.archive).presentationDetents([.height(200)]).presentationDragIndicator(.visible) }
+            .fullScreenCover(item: $_selectedSigningAppPresenting) { app in SigningView(app: app.base, signAndInstall: app.signAndInstall).compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace) }
+            .fullScreenCover(item: $_selectedAppDylibsPresenting) { app in DylibsView(app: app.base).compatNavigationTransition(id: app.base.uuid ?? "", ns: _namespace) }
             .fullScreenCover(isPresented: $_isBulkSigningPresenting) {
-                BulkSigningView(apps: _selectedApps.compactMap { id in
-                    (_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                    ?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                })
+                BulkSigningView(apps: _selectedApps.compactMap { id in (_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?) ?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?) })
                 .compatNavigationTransition(id: _selectedApps.joined(separator: ","), ns: _namespace)
-                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ksign.bulkSigningFinished"))) { notification in
-                    _selectedTab = 1
-                }
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ksign.bulkSigningFinished"))) { _ in _selectedTab = 1 }
             }
             .sheet(isPresented: $_isBulkInstallingPresenting) {
-                BulkInstallPreviewView(apps: _selectedApps.compactMap { id in
-                    (_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                    ?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?)
-                })
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
+                BulkInstallPreviewView(apps: _selectedApps.compactMap { id in (_importedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?) ?? (_signedApps.first(where: { $0.uuid == id }) as AppInfoPresentable?) }).presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $_isImportingPresenting) {
-                FileImporterRepresentableView(
-                    allowedContentTypes:  [.ipa, .tipa],
-                    allowsMultipleSelection: true,
-                    onDocumentsPicked: { urls in
-                        guard !urls.isEmpty else { return }
-                        
-                        for ipas in urls {
-                            let id = "FeatherManualDownload_\(UUID().uuidString)"
-                            let dl = downloadManager.startArchive(from: ipas, id: id)
-                            downloadManager.handlePachageFile(url: ipas, dl: dl) { err in
-                                if let error = err {
-                                    UIAlertController.showAlertWithOk(title: "Error", message: .localized("Whoops!, something went wrong when extracting the file. \nMaybe try switching the extraction library in the settings?"))
-                                }
-                            }
+                FileImporterRepresentableView(allowedContentTypes: [.ipa, .tipa], allowsMultipleSelection: true) { urls in
+                    guard !urls.isEmpty else { return }
+                    for ipas in urls {
+                        let id = "FeatherManualDownload_\(UUID().uuidString)"
+                        let dl = downloadManager.startArchive(from: ipas, id: id)
+                        downloadManager.handlePachageFile(url: ipas, dl: dl) { err in
+                            if err != nil { UIAlertController.showAlertWithOk(title: "Error", message: .localized("Whoops!, something went wrong")) }
                         }
                     }
-                )
+                }
             }
             .alert(.localized("Import from URL"), isPresented: $_isDownloadingPresenting) {
                 TextField(.localized("URL"), text: $_alertDownloadString)
-                Button(.localized("Cancel"), role: .cancel) {
-                    _alertDownloadString = ""
-                }
+                Button(.localized("Cancel"), role: .cancel) { _alertDownloadString = "" }
                 Button(.localized("OK")) {
-                    if let url = URL(string: _alertDownloadString), !_alertDownloadString.isEmpty {
-                        _ = downloadManager.startDownload(from: url, id: "FeatherManualDownload_\(UUID().uuidString)")
-                    }
+                    if let url = URL(string: _alertDownloadString), !_alertDownloadString.isEmpty { _ = downloadManager.startDownload(from: url, id: "FeatherManualDownload_\(UUID().uuidString)") }
                     _alertDownloadString = ""
                 }
             }
             // ==========================================
-            // 🚀 نظام التوقيع التلقائي الذكي (One-Click Auto Sign)
+            // استقبال إشارة التوقيع من المتجر
             // ==========================================
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HassanyStoreAutoSignRequest"))) { notification in
-                // 1. نستلم اسم التطبيق من الإشارة
-                guard let appNameToSign = notification.object as? String else { return }
-                
-                // 2. نبحث عن التطبيق اللي هسه نزل بقسم (التطبيقات التي تم تنزيلها)
-                if let appToAutoSign = _importedApps.first(where: { $0.name == appNameToSign }) {
-                    
-                    // 3. نفتح شاشة التوقيع المخفية (SigningView) مع تفعيل خيار (Sign & Install)
-                    let signAndInstallApp = AnyApp(base: appToAutoSign, signAndInstall: true)
-                    
-                    // نأخرها نص ثانية حتى نضمن الواجهات مرتبة
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        _selectedSigningAppPresenting = signAndInstallApp
-                    }
+                if let appNameToSign = notification.object as? String {
+                    // تشغيل الرادار للبحث عن التطبيق (مع 7 محاولات إذا كان التطبيق كبير ويتأخر بالفك)
+                    handleAutoSignRadar(appName: appNameToSign, retries: 7)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("feather.installApp"))) { notification in
-                if let app = _signedApps.first {
-                    _selectedInstallAppPresenting = AnyApp(base: app)
-                }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("feather.installApp"))) { _ in
+                if let app = _signedApps.first { _selectedInstallAppPresenting = AnyApp(base: app) }
             }
         }
         .onChange(of: _isEditMode) { state in
-            if !state.isEditing {
-                DispatchQueue.main.asyncAfter(deadline: .now()) {
-                    withAnimation{
-                        _selectedApps.removeAll()
-                    }
-                }
+            if !state.isEditing { DispatchQueue.main.asyncAfter(deadline: .now()) { withAnimation { _selectedApps.removeAll() } } }
+        }
+    }
+    
+    // MARK: - Smart Radar Function (رادار البحث والتوقيع)
+    private func handleAutoSignRadar(appName: String, retries: Int) {
+        // 1. نبحث عن التطبيق بقائمة التطبيقات اللي نزلت
+        if let appToAutoSign = _importedApps.first(where: { ($0.name ?? "") == appName }) {
+            
+            // 2. نغلف التطبيق ونعطيه أمر "التوقيع والتثبيت"
+            var autoSignApp = AnyApp(base: appToAutoSign)
+            autoSignApp.signAndInstall = true
+            
+            // 3. نفتح شاشة التوقيع أوتوماتيكياً
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                _selectedSigningAppPresenting = autoSignApp
             }
+            
+        } else if retries > 0 {
+            // 4. إذا التطبيق بعده دا ينفك ضغطه وما موجود، ننتظر 1.5 ثانية ونحاول مرة ثانية!
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                handleAutoSignRadar(appName: appName, retries: retries - 1)
+            }
+        } else {
+            print("⚠️ رادار متجر الحسني: لم يتم العثور على التطبيق بعد انتهاء الوقت.")
         }
     }
 }
@@ -379,19 +224,12 @@ struct LibraryView: View {
 extension LibraryView {
     private func _bulkDeleteSelectedApps() {
         let appsToDelete = _selectedApps
-        
         withAnimation(.easeInOut(duration: 0.5)) {
             for appUUID in appsToDelete {
-                if let signedApp = _signedApps.first(where: { $0.uuid == appUUID }) {
-                    Storage.shared.deleteApp(for: signedApp)
-                } else if let importedApp = _importedApps.first(where: { $0.uuid == appUUID }) {
-                    Storage.shared.deleteApp(for: importedApp)
-                }
+                if let signedApp = _signedApps.first(where: { $0.uuid == appUUID }) { Storage.shared.deleteApp(for: signedApp) }
+                else if let importedApp = _importedApps.first(where: { $0.uuid == appUUID }) { Storage.shared.deleteApp(for: importedApp) }
             }
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            _selectedApps.removeAll()
-        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { _selectedApps.removeAll() }
     }
 }
