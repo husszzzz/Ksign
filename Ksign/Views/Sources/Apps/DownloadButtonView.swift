@@ -19,14 +19,14 @@ struct DownloadButtonView: View {
     @State private var downloadProgress: Double = 0
     @State private var cancellable: AnyCancellable?
     
-    // حالات الزر الجديدة للأتمتة
+    // حالات الزر للأتمتة (التوقيع التلقائي)
     @State private var isSigning: Bool = false
     @State private var hasTriggeredAutomation: Bool = false
 
     var body: some View {
         ZStack {
             if isSigning {
-                // 1. حالة التوقيع التلقائي (بعد اكتمال التحميل)
+                // 1. حالة التوقيع (بعد اكتمال التحميل)
                 HStack(spacing: 8) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -37,7 +37,7 @@ struct DownloadButtonView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
-                .background(Color.orange) // لون مميز لعملية التوقيع
+                .background(Color.orange)
                 .clipShape(Capsule())
                 .shadow(color: .orange.opacity(0.4), radius: 4, x: 0, y: 2)
                 
@@ -65,7 +65,6 @@ struct DownloadButtonView: View {
                 // 3. حالة الزر الافتراضية
                 Button {
                     if let url = app.currentDownloadUrl {
-                        // تصفير الحالات عند بدء تحميل جديد
                         hasTriggeredAutomation = false
                         isSigning = false
                         _ = downloadManager.startDownload(from: url, id: app.currentUniqueId)
@@ -93,7 +92,7 @@ struct DownloadButtonView: View {
         }
         .onAppear {
             setupObserver()
-            requestNotificationPermission() // طلب صلاحية الإشعارات
+            requestNotificationPermission() // طلب إذن الإشعارات من المستخدم
         }
         .onDisappear { cancellable?.cancel() }
         .onChange(of: downloadManager.downloads.description) { _ in
@@ -119,7 +118,7 @@ struct DownloadButtonView: View {
         cancellable = publisher.sink { _, _ in
             downloadProgress = download.overallProgress
             
-            // الأتمتة: عندما يكتمل التحميل ننتقل للتوقيع تلقائياً
+            // 🚀 الأتمتة: بمجرد أن يكتمل التحميل (1.0) نطلق عملية التوقيع تلقائياً
             if downloadProgress >= 1.0 && !hasTriggeredAutomation {
                 hasTriggeredAutomation = true
                 startAutoSignAndInstallPipeline()
@@ -127,30 +126,42 @@ struct DownloadButtonView: View {
         }
     }
     
-    // MARK: - Automation Pipeline
+    // MARK: - Automation Pipeline (التوقيع والإشعار)
     private func startAutoSignAndInstallPipeline() {
-        isSigning = true // تغيير شكل الزر
+        isSigning = true // تحويل الزر إلى "جاري التوقيع..."
         
-        // هنا يجب استدعاء كود التوقيع الفعلي الخاص بمشروعك.
-        // محاكاة مؤقتة لعملية التوقيع (3 ثواني) لغرض التجربة:
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            
-            // 1. إرسال الإشعار
-            sendSuccessNotification()
-            
-            // 2. فتح نافذة التثبيت (يجب ربطها بكود التثبيت الفعلي)
-            // InstallManager.shared.install(app: app)
-            
-            // إنهاء حالة التوقيع
-            isSigning = false
+        Task.detached {
+            do {
+                // 1. تجهيز المتطلبات بناءً على كود صورتك
+                let installerViewModel = await InstallerStatusViewModel()
+                
+                // 2. تشغيل كود التوقيع (ArchiveHandler)
+                // ⚠️ انتبه للملاحظة بالأسفل إذا ظهر لك خطأ هنا
+                let handler = await ArchiveHandler(app: app as! any App, viewModel: installerViewModel)
+                try await handler.move()
+                let packageUrl = try await handler.archive()
+                
+                // 3. هنا يكتمل التوقيع ويصبح التطبيق جاهزاً للتثبيت
+                
+                // 4. إرسال الإشعار وتغيير حالة الزر بعد النجاح
+                await MainActor.run {
+                    sendSuccessNotification()
+                    isSigning = false
+                }
+            } catch {
+                await MainActor.run {
+                    print("❌ فشل التوقيع: \(error)")
+                    isSigning = false
+                }
+            }
         }
     }
     
-    // MARK: - Notifications System
+    // MARK: - Notifications System (نظام الإشعارات)
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
             if granted {
-                print("تمت الموافقة على الإشعارات")
+                print("✅ تمت الموافقة على الإشعارات")
             }
         }
     }
@@ -158,8 +169,7 @@ struct DownloadButtonView: View {
     private func sendSuccessNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Hassany Store"
-        let appName = app.currentName
-        content.body = "اكتمل توقيع وتثبيت \(appName)، يمكن العثور عليه في الشاشة الرئيسية."
+        content.body = "اكتمل توقيع وتثبيت \(app.currentName)، يمكن العثور عليه في الشاشة الرئيسية."
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
