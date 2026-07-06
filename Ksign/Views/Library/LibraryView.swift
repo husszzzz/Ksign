@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 10.04.2025.
-//  Modified for Hassany Store Theme (Purple Glass UI)
+//  Modified for Hassany Store Theme (One-Click Auto-Sign Receiver)
 //
 
 import SwiftUI
@@ -69,7 +69,7 @@ struct LibraryView: View {
             VStack(spacing: 0) {
                 
                 // ==========================================
-                // 1. شريط البحث العائم الفخم (Custom Search Bar)
+                // 1. شريط البحث العائم الفخم
                 // ==========================================
                 HStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")
@@ -105,7 +105,7 @@ struct LibraryView: View {
                 .padding(.top, 10)
                 
                 // ==========================================
-                // 2. أزرار التبديل الكبسولية (Custom Segmented Control)
+                // 2. أزرار التبديل الكبسولية
                 // ==========================================
                 HStack(spacing: 0) {
                     ForEach([0, 1], id: \.self) { index in
@@ -181,9 +181,6 @@ struct LibraryView: View {
                 }
             }
             .overlay {
-                // ==========================================
-                // تصميم حالة الفراغ (لا توجد تطبيقات) باللون البنفسجي
-                // ==========================================
                 if _filteredSignedApps.isEmpty && _filteredImportedApps.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "signature")
@@ -192,7 +189,7 @@ struct LibraryView: View {
                             .overlay(
                                 Image(systemName: "xmark")
                                     .font(.system(size: 22, weight: .bold))
-                                    .foregroundColor(.purple) // بصمة بنفسجية
+                                    .foregroundColor(.purple) 
                                     .offset(x: 25, y: 15)
                             )
                             .padding(.bottom, 8)
@@ -339,6 +336,25 @@ struct LibraryView: View {
                         _ = downloadManager.startDownload(from: url, id: "FeatherManualDownload_\(UUID().uuidString)")
                     }
                     _alertDownloadString = ""
+                }
+            }
+            // ==========================================
+            // 🚀 نظام التوقيع التلقائي الذكي (One-Click Auto Sign)
+            // ==========================================
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HassanyStoreAutoSignRequest"))) { notification in
+                // 1. نستلم اسم التطبيق من الإشارة
+                guard let appNameToSign = notification.object as? String else { return }
+                
+                // 2. نبحث عن التطبيق اللي هسه نزل بقسم (التطبيقات التي تم تنزيلها)
+                if let appToAutoSign = _importedApps.first(where: { $0.name == appNameToSign }) {
+                    
+                    // 3. نفتح شاشة التوقيع المخفية (SigningView) مع تفعيل خيار (Sign & Install)
+                    let signAndInstallApp = AnyApp(base: appToAutoSign, signAndInstall: true)
+                    
+                    // نأخرها نص ثانية حتى نضمن الواجهات مرتبة
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        _selectedSigningAppPresenting = signAndInstallApp
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("feather.installApp"))) { notification in
