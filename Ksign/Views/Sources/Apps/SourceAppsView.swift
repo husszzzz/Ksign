@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Pro VIP UI, Hidden Sources, Smart Filters, App Count - Fixed)
+//  Modified for Hassany Store (Clean Grid UI, Removed Categories)
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ import AltSourceKit
 import NimbleViews
 import UIKit
 
-// MARK: - Extension: View (Sort & Categories)
+// MARK: - Extension: View (Sort)
 extension SourceAppsView {
     enum SortOption: String, CaseIterable {
         case `default` = "default"
@@ -26,14 +26,6 @@ extension SourceAppsView {
             }
         }
     }
-    
-    // الفلاتر (التصنيفات)
-    enum AppCategory: String, CaseIterable {
-        case all = "الكل"
-        case apps = "تطبيقات"
-        case games = "ألعاب"
-        case national = "تواصل وطني"
-    }
 }
 
 // MARK: - View
@@ -43,7 +35,6 @@ struct SourceAppsView: View {
     
     @State private var _sortOption: SortOption = .default
     @State private var _selectedRoute: SourceAppRoute?
-    @State private var _selectedCategory: AppCategory = .all
     @State private var isRefreshing = false
     
     @State var isLoading = true
@@ -52,7 +43,7 @@ struct SourceAppsView: View {
     var fromAppStore: Bool = false
     
     private var _navigationTitle: String {
-        return "App Store" // تم تثبيت الاسم لإخفاء معلومات المتجر الأصلي
+        return "App Store"
     }
     
     var object: [AltSource]
@@ -65,7 +56,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // الفلترة الذكية (تم حل مشكلة الـ Xcode بالاعتماد على الاسم فقط)
+    // الفلترة والترتيب (البحث فقط، تم حذف الأقسام)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
@@ -81,39 +72,6 @@ struct SourceAppsView: View {
             all = all.filter { route in
                 let appName = route.app.name ?? ""
                 return appName.lowercased().contains(currentSearch)
-            }
-        }
-        
-        let currentCategory = _selectedCategory
-        if currentCategory != .all {
-            // الكلمات المفتاحية الذكية للعزل
-            let gameKeywords = ["game", "pubg", "gta", "pes", "fifa", "لعب", "كود", "ببجي", "مهكر", "minecraft", "roblox", "car", "racing", "clash"]
-            let nationalKeywords = ["زين", "اسيا", "كورك", "وطني", "عراق", "iraq", "zain", "asia", "korek", "earthlink", "ايرثلنك", "شبكتي", "shabakaty", "cinemana", "سينمانا"]
-            
-            all = all.filter { route in
-                let name = (route.app.name ?? "").lowercased()
-                
-                var isGame = false
-                var isNational = false
-                
-                for kw in gameKeywords {
-                    if name.contains(kw) {
-                        isGame = true
-                        break
-                    }
-                }
-                
-                for kw in nationalKeywords {
-                    if name.contains(kw) {
-                        isNational = true
-                        break
-                    }
-                }
-                
-                if currentCategory == .games { return isGame }
-                if currentCategory == .national { return isNational }
-                if currentCategory == .apps { return !isGame && !isNational }
-                return true
             }
         }
         
@@ -140,10 +98,7 @@ struct SourceAppsView: View {
                         // 1. زر التحديث الفخم
                         _refreshBanner()
                         
-                        // 2. كبسولات الفلاتر
-                        _categoryPills()
-                        
-                        // 3. عداد التطبيقات الجديد
+                        // 2. عداد التطبيقات
                         HStack {
                             Text("عدد التطبيقات المتاحة: \(_filteredApps.count)")
                                 .font(.system(size: 14, weight: .bold))
@@ -156,7 +111,7 @@ struct SourceAppsView: View {
                         }
                         .padding(.horizontal, 16)
                         
-                        // 4. شبكة التطبيقات
+                        // 3. شبكة التطبيقات (بدون الفلاتر)
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                             ForEach(_filteredApps, id: \.id) { route in
                                 Button(action: {
@@ -187,7 +142,6 @@ struct SourceAppsView: View {
         .navigationTitle(_navigationTitle)
         .searchable(text: $_searchText, placement: .platform())
         .toolbar {
-            // 🚫 تم حذف كود زر المصادر نهائياً لحماية المتجر
             NBToolbarMenu(
                 systemImage: "arrow.up.arrow.down.circle",
                 style: .icon,
@@ -232,9 +186,7 @@ struct SourceAppsView: View {
     }
 }
 
-// MARK: - Extension: View (UI Components)
 extension SourceAppsView {
-    
     @ViewBuilder
     private func _refreshBanner() -> some View {
         Button(action: {
@@ -279,38 +231,6 @@ extension SourceAppsView {
         }
         .buttonStyle(.plain)
     }
-    
-    @ViewBuilder
-    private func _categoryPills() -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(AppCategory.allCases, id: \.self) { category in
-                    Button(action: {
-                        let impact = UISelectionFeedbackGenerator()
-                        impact.selectionChanged()
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
-                            _selectedCategory = category
-                        }
-                    }) {
-                        Text(category.rawValue)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(_selectedCategory == category ? .white : .gray)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 10)
-                            .background(
-                                _selectedCategory == category 
-                                ? Color.purple 
-                                : Color(UIColor.secondarySystemGroupedBackground)
-                            )
-                            .clipShape(Capsule())
-                            .shadow(color: _selectedCategory == category ? .purple.opacity(0.4) : .clear, radius: 4, x: 0, y: 2)
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 4)
-        }
-    }
 
     @ViewBuilder
     private func _sortActions() -> some View {
@@ -351,7 +271,6 @@ extension View {
     }
 }
 
-// MARK: - App Card View
 struct AppCardView: View {
     let route: SourceAppsView.SourceAppRoute
     
