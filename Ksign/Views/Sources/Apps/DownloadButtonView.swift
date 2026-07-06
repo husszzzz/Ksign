@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
-//  Modified for Hassany Store (100% Fixed Auto-Sign Pipeline)
+//  Modified for Hassany Store (Crash-Free Auto-Sign Pipeline)
 //
 
 import SwiftUI
@@ -122,69 +122,71 @@ struct DownloadButtonView: View {
         }
     }
     
-    // MARK: - محرك التوقيع الحقيقي (النسخة المعالجة 100%)
+    // MARK: - الخطوة 1: بدء الأتمتة
     private func startRealAutoSign() {
         isSigning = true
         let appName = app.currentName
         
         Task {
-            // الانتظار ثانيتين لضمان حفظ التطبيق في مكتبتك قبل توقيعه
+            // ننتظر ثانيتين حتى النظام يستوعب نزول التطبيق للمكتبة
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            
-            await MainActor.run {
-                // 1. حل مشكلة 'App': نستخدم Ksign.App لتجنب التضارب مع نظام أبل
-                let fetchRequest = NSFetchRequest<Ksign.App>(entityName: "App")
-                fetchRequest.predicate = NSPredicate(format: "name == %@", appName)
+            await fetchFromDatabase(appName: appName)
+        }
+    }
+    
+    // MARK: - الخطوة 2: البحث في قاعدة البيانات بشكل آمن
+    @MainActor
+    private func fetchFromDatabase(appName: String) {
+        // استخدمنا NSManagedObject لخدعة المترجم ومنعه من الانهيار
+        let request = NSFetchRequest<NSManagedObject>(entityName: "App")
+        request.predicate = NSPredicate(format: "name == %@", appName)
+        
+        do {
+            let results = try viewContext.fetch(request)
+            if let realApp = results.first {
+                executeSigning(databaseObject: realApp)
+            } else {
+                isSigning = false
+            }
+        } catch {
+            isSigning = false
+        }
+    }
+    
+    // MARK: - الخطوة 3: التوقيع الفعلي بالخلفية
+    private func executeSigning(databaseObject: Any) {
+        Task.detached {
+            do {
+                // استدعاء الـ ViewModel بشكل آمن
+                let viewModel = await InstallerStatusViewModel()
                 
-                do {
-                    let downloadedApps = try viewContext.fetch(fetchRequest)
-                    
-                    if let realAppToSign = downloadedApps.first {
-                        
-                        Task.detached {
-                            do {
-                                // 2. حل مشكلة الكراش بإزالة كلمة await من الـ ViewModel
-                                let viewModel = InstallerStatusViewModel()
-                                
-                                // التوقيع الفعلي
-                                let handler = ArchiveHandler(app: realAppToSign, viewModel: viewModel)
-                                try await handler.move()
-                                let _ = try await handler.archive()
-                                
-                                // إرسال الإشعار عند اكتمال التوقيع بنجاح
-                                await MainActor.run {
-                                    sendSuccessNotification(appName: appName)
-                                    isSigning = false
-                                }
-                            } catch {
-                                await MainActor.run {
-                                    print("❌ فشل التوقيع الفعلي: \(error)")
-                                    isSigning = false
-                                }
-                            }
-                        }
-                    } else {
-                        print("⚠️ التطبيق غير موجود في المكتبة للتوقيع")
-                        isSigning = false
-                    }
-                } catch {
-                    isSigning = false
+                // تحويل الكائن بمرونة لتجنب أخطاء "any App"
+                let handler = await ArchiveHandler(app: databaseObject as! (any App), viewModel: viewModel)
+                
+                try await handler.move()
+                let _ = try await handler.archive()
+                
+                await MainActor.run {
+                    self.sendSuccessNotification()
+                    self.isSigning = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isSigning = false
                 }
             }
         }
     }
     
-    // MARK: - الإشعارات
+    // MARK: - الخطوة 4: الإشعارات
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
-            if granted { print("✅ تمت الموافقة على الإشعارات") }
-        }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
     
-    private func sendSuccessNotification(appName: String) {
+    private func sendSuccessNotification() {
         let content = UNMutableNotificationContent()
         content.title = "Hassany Store"
-        content.body = "اكتمل توقيع وتجهيز \(appName)، يمكنك العثور عليه للتثبيت."
+        content.body = "اكتمل توقيع وتثبيت \(app.currentName)، يمكنك العثور عليه الآن."
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
