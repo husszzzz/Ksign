@@ -3,17 +3,26 @@
 //  feather
 //
 //  Created by samara on 23.03.2025.
-//  Modified for Hassany Store (Ultra VIP Floating Glassmorphism TabBar)
+//  Modified for Hassany Store (Forced Floating Glassmorphism TabBar)
 //
 
 import SwiftUI
 
 struct TabbarView: View {
-    @State private var selectedTab: TabEnum = .home // التعديل لتفتح الرئيسية أولاً
-    @Namespace private var animation // للأنيميشن السلس (Dynamic Effect)
+    @State private var selectedTab: TabEnum = .home
+    @Namespace private var animation
 
     init() {
-        // إخفاء شريط النظام الافتراضي الكئيب بالكامل
+        // الطريقة القاضية لإخفاء شريط أبل الافتراضي نهائياً في كل إصدارات الـ iOS
+        let appearance = UITabBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = .clear
+        
+        UITabBar.appearance().standardAppearance = appearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = appearance
+        }
         UITabBar.appearance().isHidden = true
     }
 
@@ -25,19 +34,19 @@ struct TabbarView: View {
                 ForEach(TabEnum.defaultTabs, id: \.hashValue) { tab in
                     TabEnum.view(for: tab)
                         .tag(tab)
-                        // إضافة مسافة سفلية حتى لا يغطي الشريط العائم على محتوى التطبيقات
+                        // إجبار إخفاء الشريط في iOS 16 وما فوق
+                        .toolbar(.hidden, for: .tabBar)
+                        // مسافة سفلية حتى المحتوى ما يختفي خلف الشريط العائم
                         .padding(.bottom, 90) 
-                        .ignoresSafeArea(.all, edges: .bottom)
                 }
             }
 
-            // 2. الشريط العائم الزجاجي (VIP Floating Bar)
+            // 2. الشريط العائم الزجاجي الفخم
             HStack(spacing: 0) {
                 ForEach(TabEnum.defaultTabs, id: \.hashValue) { tab in
                     let isSelected = selectedTab == tab
                     
                     Button(action: {
-                        // هزة خفيفة (Haptic Feedback) عند الضغط للشعور بالفخامة
                         let impact = UIImpactFeedbackGenerator(style: .light)
                         impact.impactOccurred()
                         withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0.5)) {
@@ -46,7 +55,7 @@ struct TabbarView: View {
                     }) {
                         HStack(spacing: isSelected ? 8 : 0) {
                             Image(systemName: tab.icon)
-                                .font(.system(size: 20, weight: .bold))
+                                .font(.system(size: 22, weight: .semibold))
                             
                             if isSelected {
                                 Text(tab.title)
@@ -54,7 +63,7 @@ struct TabbarView: View {
                                     .lineLimit(1)
                             }
                         }
-                        .foregroundColor(isSelected ? .white : .gray.opacity(0.8))
+                        .foregroundColor(isSelected ? .white : .gray.opacity(0.7))
                         .padding(.vertical, 12)
                         .padding(.horizontal, isSelected ? 20 : 15)
                         .background(
@@ -72,27 +81,27 @@ struct TabbarView: View {
                             }
                         )
                     }
-                    .frame(maxWidth: isSelected ? .infinity : nil) // التمدد للزر النشط فقط
+                    .frame(maxWidth: isSelected ? .infinity : nil)
                 }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 8)
             .background(
                 ZStack {
-                    Color.black.opacity(0.5) // عتامة خفيفة
+                    Color.black.opacity(0.65)
                     if #available(iOS 15.0, *) {
-                        Rectangle().fill(.ultraThinMaterial) // تأثير الزجاج (Glassmorphism)
+                        Rectangle().fill(.ultraThinMaterial)
                     }
                 }
             )
             .clipShape(Capsule())
             .overlay(
-                Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1) // إطار زجاجي فخم
+                Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1)
             )
-            .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+            .shadow(color: .black.opacity(0.4), radius: 25, x: 0, y: 15)
             .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, 10) // ارتفاع الشريط عن حافة الشاشة
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom) // حتى لا يرتفع الشريط مع الكيبورد
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 }
