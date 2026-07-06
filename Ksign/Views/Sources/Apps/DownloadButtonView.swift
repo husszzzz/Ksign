@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
-//  Modified for Hassany Store (Fixed Automation Pipeline)
+//  Modified for Hassany Store (Real Auto-Sign & Install Pipeline)
 //
 
 import SwiftUI
@@ -11,10 +11,12 @@ import Combine
 import AltSourceKit
 import NimbleViews
 import UserNotifications
+import CoreData // مكتبة قاعدة البيانات للبحث عن التطبيق بعد تحميله
 
 struct DownloadButtonView: View {
     let app: ASRepository.App
     @ObservedObject private var downloadManager = DownloadManager.shared
+    @Environment(\.managedObjectContext) private var viewContext // للوصول لمكتبة التطبيقات
 
     @State private var downloadProgress: Double = 0
     @State private var cancellable: AnyCancellable?
@@ -24,6 +26,7 @@ struct DownloadButtonView: View {
     var body: some View {
         ZStack {
             if isSigning {
+                // 1. حالة التوقيع الفعلي
                 HStack(spacing: 8) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -39,6 +42,7 @@ struct DownloadButtonView: View {
                 .shadow(color: .orange.opacity(0.4), radius: 4, x: 0, y: 2)
                 
             } else if let currentDownload = downloadManager.getDownload(by: app.currentUniqueId) {
+                // 2. حالة التحميل
                 ZStack {
                     Circle()
                         .trim(from: 0, to: downloadProgress)
@@ -58,6 +62,7 @@ struct DownloadButtonView: View {
                 }
                 .compatTransition()
             } else {
+                // 3. زر التثبيت
                 Button {
                     if let url = app.currentDownloadUrl {
                         hasTriggeredAutomation = false
@@ -113,42 +118,80 @@ struct DownloadButtonView: View {
         cancellable = publisher.sink { _, _ in
             downloadProgress = download.overallProgress
             
+            // بمجرد أن يكتمل التحميل، نبدأ رحلة التوقيع الحقيقية
             if downloadProgress >= 1.0 && !hasTriggeredAutomation {
                 hasTriggeredAutomation = true
-                startAutoSignAndInstallPipeline()
+                startRealAutoSign()
             }
         }
     }
     
-    // MARK: - Automation Pipeline (النسخة الآمنة)
-    private func startAutoSignAndInstallPipeline() {
+    // MARK: - Real Auto-Sign Engine (محرك التوقيع الحقيقي)
+    private func startRealAutoSign() {
         isSigning = true
+        let appName = app.currentName
         
         Task {
-            // محاكاة عملية التوقيع لإعطاء وقت للتطبيق لنقل الملفات للمكتبة بسلاسة
-            // ننتظر 3 ثواني كأنيميشن توقيع
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            // 1. ننتظر ثانية ونص حتى نعطي مجال لنظام Feather يحفظ التطبيق في المكتبة (CoreData)
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
             
             await MainActor.run {
-                sendSuccessNotification()
-                isSigning = false
+                // 2. نبحث عن التطبيق اللي نزلناه هسه داخل المكتبة (عن طريق اسمه)
+                let fetchRequest: NSFetchRequest<App> = App.fetchRequest()
+                fetchRequest.predicate = NSPredicate(format: "name == %@", appName)
+                
+                do {
+                    let downloadedApps = try viewContext.fetch(fetchRequest)
+                    
+                    // 3. إذا لكينا التطبيق بالمكتبة (نفس اللي طالع عندك بالصورة)
+                    if let realAppToSign = downloadedApps.first {
+                        
+                        // 4. نشغل محرك التوقيع الحقيقي عليه
+                        Task.detached {
+                            do {
+                                let viewModel = await InstallerStatusViewModel()
+                                // تمرير التطبيق الحقيقي من قاعدة البيانات بدلاً من تطبيق المتجر
+                                let handler = await ArchiveHandler(app: realAppToSign, viewModel: viewModel)
+                                
+                                try await handler.move()
+                                let _ = try await handler.archive()
+                                
+                                // نجح التوقيع! نرسل إشعار
+                                await MainActor.run {
+                                    sendSuccessNotification(appName: appName)
+                                    isSigning = false
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    print("❌ فشل التوقيع الفعلي: \(error)")
+                                    isSigning = false
+                                }
+                            }
+                        }
+                    } else {
+                        // إذا التطبيق ما انحفظ بالمكتبة بعد
+                        print("⚠️ لم يتم العثور على التطبيق في المكتبة للتوقيع")
+                        isSigning = false
+                    }
+                } catch {
+                    print("❌ خطأ في البحث عن التطبيق: \(error)")
+                    isSigning = false
+                }
             }
         }
     }
     
     // MARK: - Notifications System
     private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if granted {
-                print("✅ تمت الموافقة على الإشعارات")
-            }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+            if granted { print("✅ تمت الموافقة على الإشعارات") }
         }
     }
     
-    private func sendSuccessNotification() {
+    private func sendSuccessNotification(appName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Hassany Store"
-        content.body = "اكتمل تحميل وتجهيز \(app.currentName)، يمكن العثور عليه في التطبيق للتثبيت."
+        content.body = "اكتمل توقيع وتثبيت \(appName)، يمكنك العثور عليه الآن."
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
