@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
-//  Modified for Hassany Store (VIP Glassmorphism & Hidden Source)
+//  Modified for Hassany Store (Ultra VIP Design, Blurred Background, No Source)
 //
 
 import SwiftUI
@@ -12,11 +12,10 @@ import AltSourceKit
 import NimbleViews
 import NukeUI
 
-// MARK: - SourceAppsDetailView
 struct SourceAppsDetailView: View {
     @ObservedObject var downloadManager = DownloadManager.shared
     @State private var _downloadProgress: Double = 0
-    @State var cancellable: AnyCancellable? // Combine
+    @State var cancellable: AnyCancellable?
     @State private var _isScreenshotPreviewPresented: Bool = false
     @State private var _selectedScreenshotIndex: Int = 0
     
@@ -28,179 +27,130 @@ struct SourceAppsDetailView: View {
     var app: ASRepository.App
     
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            
-            // 1. الهيدر الفخم (أيقونة + معلوما أساسية + زر تثبيت)
-            VStack(spacing: 20) {
-                HStack(alignment: .top, spacing: 16) {
-                    // أيقونة التطبيق
-                    if let iconURL = app.iconURL {
-                        LazyImage(url: iconURL) { state in
-                            if let image = state.image {
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 100, height: 100)
-                                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                                    .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                            } else {
-                                standardIcon
-                            }
-                        }
-                    } else {
-                        standardIcon
+        ZStack {
+            // 1. الخلفية المغبشة (Blurred Background) الفخمة
+            if let iconURL = app.iconURL {
+                LazyImage(url: iconURL) { state in
+                    if let image = state.image {
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .edgesIgnoringSafeArea(.all)
+                            .blur(radius: 50)
+                            .opacity(0.4)
                     }
-
-                    // اسم التطبيق والوصف المختصر
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(app.currentName)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                            .lineLimit(2)
-                        
-                        Text(app.currentDescription ?? .localized("An awesome application"))
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.gray)
-                            .lineLimit(2)
-                        
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal)
-                .padding(.top, 16)
-                
-                // زر التثبيت الكبير (Gradient)
-                HStack {
+            }
+            Color.black.opacity(0.6).edgesIgnoringSafeArea(.all) // طبقة تعتيم فوق الغبش
+            
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 24) {
+                    
+                    // 2. الهيدر (الأيقونة واسم التطبيق)
+                    VStack(spacing: 16) {
+                        if let iconURL = app.iconURL {
+                            LazyImage(url: iconURL) { state in
+                                if let image = state.image {
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 120, height: 120)
+                                        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                                        .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 8)
+                                } else {
+                                    standardIcon
+                                }
+                            }
+                        } else {
+                            standardIcon
+                        }
+                        
+                        VStack(spacing: 6) {
+                            Text(app.currentName)
+                                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                            
+                            Text(app.developer ?? "Hassany Store")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(.top, 20)
+                    
+                    // 3. زر التثبيت العملاق (VIP Gradient)
                     DownloadButtonView(app: app)
+                        .frame(height: 50)
                         .frame(maxWidth: .infinity)
-                        .font(.headline)
-                        .padding(.vertical, 4)
                         .background(
                             LinearGradient(
-                                gradient: Gradient(colors: [Color.purple, Color(red: 0.4, green: 0.1, blue: 0.7)]),
+                                gradient: Gradient(colors: [Color.purple, Color(red: 0.4, green: 0.1, blue: 0.8)]),
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .clipShape(Capsule())
-                        .shadow(color: .purple.opacity(0.4), radius: 6, x: 0, y: 3)
-                }
-                .padding(.horizontal)
-                
-                // كبسولات المعلومات (الحجم والإصدار)
-                _infoPills(app: app)
-                    .padding(.horizontal)
-            }
-            .padding(.bottom, 10)
-            
-            VStack(spacing: 16) {
-                // 2. لقطات الشاشة (Screenshots)
-                if let screenshotURLs = app.screenshotURLs {
-                    _glassSection(title: .localized("Screenshots")) {
-                        _screenshots(screenshotURLs: screenshotURLs)
-                    }
-                }
-                
-                // 3. ما الجديد (What's New)
-                if let currentVer = app.currentVersion, let whatsNewDesc = app.currentAppVersion?.localizedDescription {
-                    _glassSection(title: .localized("What's New")) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            AppVersionInfo(
-                                version: currentVer,
-                                date: app.currentDate?.date,
-                                description: whatsNewDesc
-                            )
-                            if let versions = app.versions {
-                                NavigationLink(destination: VersionHistoryView(app: app, versions: versions).navigationTitle(.localized("Version History")).navigationBarTitleDisplayMode(.large)) {
-                                    Text(.localized("Version History"))
-                                        .font(.subheadline.bold())
-                                        .foregroundColor(.purple)
-                                        .padding(.top, 4)
-                                }
-                            }
+                        .shadow(color: .purple.opacity(0.5), radius: 10, x: 0, y: 5)
+                        .padding(.horizontal, 24)
+                    
+                    // 4. شريط الإحصائيات الأفقي (بدل القائمة الكئيبة)
+                    _horizontalStatsRow()
+                    
+                    Divider().background(Color.white.opacity(0.2)).padding(.horizontal)
+                    
+                    // 5. لقطات الشاشة
+                    if let screenshotURLs = app.screenshotURLs {
+                        _glassSection(title: .localized("Screenshots")) {
+                            _screenshots(screenshotURLs: screenshotURLs)
                         }
                     }
-                }
-                
-                // 4. الوصف (Description)
-                if let appDesc = app.localizedDescription {
-                    _glassSection(title: .localized("Description")) {
-                        ExpandableText(text: appDesc, lineLimit: 4)
-                            .foregroundColor(.white.opacity(0.9))
-                    }
-                }
-                
-                // 5. المعلومات (Information) - تم إخفاء المصدر 🚫
-                _glassSection(title: .localized("Information")) {
-                    VStack(spacing: 12) {
-                        // 🚫 تم حذف حقل "المصدر" (Source) من هنا
-                        
-                        if let developer = app.developer, !developer.isEmpty {
-                            _infoRow(title: .localized("Developer"), value: developer)
-                        }
-                        if let size = app.size {
-                            _infoRow(title: .localized("Size"), value: size.formattedByteCount)
-                        }
-                        if let category = app.category, !category.isEmpty {
-                            _infoRow(title: .localized("Category"), value: category.capitalized)
-                        }
-                        if let version = app.currentVersion, !version.isEmpty {
-                            _infoRow(title: .localized("Version"), value: version)
-                        }
-                        if let date = app.currentDate?.date {
-                            _infoRow(title: .localized("Updated"), value: DateFormatter.localizedString(from: date, dateStyle: .medium, timeStyle: .none))
-                        }
-                        if let bundleId = app.id {
-                            _infoRow(title: .localized("Identifier"), value: bundleId)
+                    
+                    // 6. الوصف (Description)
+                    if let appDesc = app.localizedDescription {
+                        _glassSection(title: .localized("Description")) {
+                            ExpandableText(text: appDesc, lineLimit: 5)
+                                .font(.system(size: 15, weight: .regular))
+                                .foregroundColor(.white.opacity(0.9))
+                                .lineSpacing(4)
                         }
                     }
-                }
-                
-                // 6. الصلاحيات (Permissions)
-                if let appPermissions = app.appPermissions {
-                    _glassSection(title: .localized("Permissions")) {
-                        VStack(alignment: .leading, spacing: 12) {
-                            if let entitlements = appPermissions.entitlements {
-                                NBTitleWithSubtitleView(
-                                    title: .localized("Entitlements"),
-                                    subtitle: entitlements.map(\.name).joined(separator: "\n")
+                    
+                    // 7. ما الجديد (What's New)
+                    if let currentVer = app.currentVersion, let whatsNewDesc = app.currentAppVersion?.localizedDescription {
+                        _glassSection(title: .localized("What's New")) {
+                            VStack(alignment: .leading, spacing: 12) {
+                                AppVersionInfo(
+                                    version: currentVer,
+                                    date: app.currentDate?.date,
+                                    description: whatsNewDesc
                                 )
                             }
-                            if let privacyItems = appPermissions.privacy {
-                                ForEach(privacyItems, id: \.self) { item in
-                                    NBTitleWithSubtitleView(
-                                        title: item.name,
-                                        subtitle: item.usageDescription
-                                    )
-                                }
-                            }
                         }
                     }
+                    
+                    // 8. المعلومات الأساسية (بدون حقل المصدر)
+                    _glassSection(title: .localized("Information")) {
+                        VStack(spacing: 14) {
+                            if let bundleId = app.id { _infoRow(title: .localized("Identifier"), value: bundleId) }
+                            if let category = app.category, !category.isEmpty { _infoRow(title: .localized("Category"), value: category.capitalized) }
+                            if let version = app.currentVersion, !version.isEmpty { _infoRow(title: .localized("Version"), value: version) }
+                        }
+                    }
+                    
                 }
+                .padding(.bottom, 40)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 30)
         }
-        .background(Color.black.edgesIgnoringSafeArea(.all)) // خلفية سوداء لبروز التصميم الزجاجي
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             NBToolbarButton(systemImage: "square.and.arrow.up", placement: .topBarTrailing) {
-                let sharedString = """
-                \(app.currentName) - v\(app.currentVersion ?? "1.0")
-                \(app.currentDescription ?? "")
-                ---
-                Shared via Hassany Store
-                """
+                let sharedString = "\(app.currentName) - v\(app.currentVersion ?? "1.0")\nShared via Hassany Store"
                 UIActivityViewController.show(activityItems: [sharedString])
             }
         }
         .fullScreenCover(isPresented: $_isScreenshotPreviewPresented) {
             if let screenshotURLs = app.screenshotURLs {
-                ScreenshotPreviewView(
-                    screenshotURLs: screenshotURLs,
-                    initialIndex: _selectedScreenshotIndex
-                )
+                ScreenshotPreviewView(screenshotURLs: screenshotURLs, initialIndex: _selectedScreenshotIndex)
             }
         }
     }
@@ -208,83 +158,74 @@ struct SourceAppsDetailView: View {
     var standardIcon: some View {
         Image(systemName: "app.fill")
             .resizable()
-            .frame(width: 100, height: 100)
+            .frame(width: 120, height: 120)
             .foregroundColor(.purple.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
 }
 
-// MARK: - Extension: UI Components (Glassmorphism)
+// MARK: - Extension: UI Components
 extension SourceAppsDetailView {
     
-    // تصميم الأقسام كـ "بطاقات زجاجية" (Glass Sections)
+    // شريط الإحصائيات الأفقي الجديد
+    @ViewBuilder
+    private func _horizontalStatsRow() -> some View {
+        HStack(spacing: 0) {
+            _statItem(title: "الإصدار", value: app.currentVersion ?? "1.0")
+            Divider().frame(height: 30).background(Color.white.opacity(0.3))
+            _statItem(title: "الحجم", value: app.size?.formattedByteCount ?? "N/A")
+            Divider().frame(height: 30).background(Color.white.opacity(0.3))
+            _statItem(title: "تاريخ التحديث", value: app.currentDate?.date != nil ? DateFormatter.localizedString(from: app.currentDate!.date, dateStyle: .short, timeStyle: .none) : "N/A")
+        }
+        .padding(.vertical, 16)
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 20)
+    }
+    
+    @ViewBuilder
+    private func _statItem(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.gray)
+            Text(value)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+        }
+        .frame(maxWidth: .infinity)
+    }
+    
     @ViewBuilder
     private func _glassSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 18, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 24)
             
             content()
-                .padding(16)
-                .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.6))
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .padding(20)
+                .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.4))
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                .padding(.horizontal, 20)
         }
-    }
-    
-    @ViewBuilder
-    private func _infoPills(app: ASRepository.App) -> some View {
-        let pillItems = _buildPills(from: app)
-        HStack(spacing: 12) {
-            ForEach(pillItems.indices, id: \.hashValue) { index in
-                let pill = pillItems[index]
-                HStack(spacing: 6) {
-                    Image(systemName: pill.icon)
-                        .font(.system(size: 14, weight: .semibold))
-                    Text(pill.title)
-                        .font(.system(size: 13, weight: .bold))
-                }
-                .foregroundColor(pill.color)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(pill.color.opacity(0.15))
-                .clipShape(Capsule())
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-    
-    private func _buildPills(from app: ASRepository.App) -> [NBPillItem] {
-        var pills: [NBPillItem] = []
-        if let version = app.currentVersion {
-            pills.append(NBPillItem(title: version, icon: "tag.fill", color: .purple))
-        }
-        if let size = app.size {
-            pills.append(NBPillItem(title: size.formattedByteCount, icon: "externaldrive.fill", color: .gray))
-        }
-        return pills
     }
     
     @ViewBuilder
     private func _infoRow(title: String, value: String) -> some View {
         HStack {
-            Text(title)
-                .foregroundColor(.gray)
-                .font(.system(size: 15, weight: .medium))
+            Text(title).foregroundColor(.gray).font(.system(size: 15, weight: .medium))
             Spacer()
-            Text(value)
-                .foregroundColor(.white)
-                .font(.system(size: 15, weight: .semibold))
+            Text(value).foregroundColor(.white).font(.system(size: 14, weight: .semibold)).lineLimit(1)
         }
-        Divider().background(Color.white.opacity(0.1))
     }
     
     @ViewBuilder
     private func _screenshots(screenshotURLs: [URL]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
+            HStack(spacing: 16) {
                 ForEach(screenshotURLs.indices, id: \.self) { index in
                     let url = screenshotURLs[index]
                     LazyImage(url: url) { state in
@@ -292,8 +233,9 @@ extension SourceAppsDetailView {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(height: 250)
-                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .frame(height: 280)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
                                 .onTapGesture {
                                     _selectedScreenshotIndex = index
                                     _isScreenshotPreviewPresented = true
@@ -303,6 +245,6 @@ extension SourceAppsDetailView {
                 }
             }
         }
-        .padding(.horizontal, -16) // لتمديد السكرول لحواف الشاشة
+        .padding(.horizontal, -20)
     }
 }
