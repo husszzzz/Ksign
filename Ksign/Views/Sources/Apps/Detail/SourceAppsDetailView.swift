@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
-//  Modified for Hassany Store (Ultra VIP Design, Blurred Background, No Source)
+//  Modified for Hassany Store (VIP Glassmorphism - Fixed Layout Overflow)
 //
 
 import SwiftUI
@@ -12,6 +12,7 @@ import AltSourceKit
 import NimbleViews
 import NukeUI
 
+// MARK: - SourceAppsDetailView
 struct SourceAppsDetailView: View {
     @ObservedObject var downloadManager = DownloadManager.shared
     @State private var _downloadProgress: Double = 0
@@ -44,6 +45,7 @@ struct SourceAppsDetailView: View {
             Color.black.opacity(0.6).edgesIgnoringSafeArea(.all) // طبقة تعتيم فوق الغبش
             
             ScrollView(showsIndicators: false) {
+                // وضعنا محتوى الشاشة بالكامل داخل إطار محدد العرض لمنع التمدد الخاطئ
                 VStack(spacing: 24) {
                     
                     // 2. الهيدر (الأيقونة واسم التطبيق)
@@ -54,8 +56,8 @@ struct SourceAppsDetailView: View {
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
-                                        .frame(width: 120, height: 120)
-                                        .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                                        .frame(width: 110, height: 110)
+                                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
                                         .shadow(color: .black.opacity(0.4), radius: 15, x: 0, y: 8)
                                 } else {
                                     standardIcon
@@ -67,20 +69,21 @@ struct SourceAppsDetailView: View {
                         
                         VStack(spacing: 6) {
                             Text(app.currentName)
-                                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                                .font(.system(size: 24, weight: .heavy, design: .rounded))
                                 .foregroundColor(.white)
                                 .multilineTextAlignment(.center)
+                                .padding(.horizontal, 10)
                             
                             Text(app.developer ?? "Hassany Store")
-                                .font(.system(size: 16, weight: .medium))
+                                .font(.system(size: 15, weight: .medium))
                                 .foregroundColor(.gray)
                         }
                     }
                     .padding(.top, 20)
                     
-                    // 3. زر التثبيت العملاق (VIP Gradient)
+                    // 3. زر التثبيت العملاق (VIP Gradient - Fixed Padding)
                     DownloadButtonView(app: app)
-                        .frame(height: 50)
+                        .frame(height: 45)
                         .frame(maxWidth: .infinity)
                         .background(
                             LinearGradient(
@@ -91,22 +94,23 @@ struct SourceAppsDetailView: View {
                         )
                         .clipShape(Capsule())
                         .shadow(color: .purple.opacity(0.5), radius: 10, x: 0, y: 5)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, 30) // حماية الزر من الالتصاق بالحواف
                     
-                    // 4. شريط الإحصائيات الأفقي (بدل القائمة الكئيبة)
+                    // 4. شريط الإحصائيات الأفقي
                     _horizontalStatsRow()
+                        .padding(.horizontal, 16)
                     
-                    Divider().background(Color.white.opacity(0.2)).padding(.horizontal)
+                    Divider().background(Color.white.opacity(0.2)).padding(.horizontal, 20)
                     
                     // 5. لقطات الشاشة
-                    if let screenshotURLs = app.screenshotURLs {
+                    if let screenshotURLs = app.screenshotURLs, !screenshotURLs.isEmpty {
                         _glassSection(title: .localized("Screenshots")) {
                             _screenshots(screenshotURLs: screenshotURLs)
                         }
                     }
                     
                     // 6. الوصف (Description)
-                    if let appDesc = app.localizedDescription {
+                    if let appDesc = app.localizedDescription, !appDesc.isEmpty {
                         _glassSection(title: .localized("Description")) {
                             ExpandableText(text: appDesc, lineLimit: 5)
                                 .font(.system(size: 15, weight: .regular))
@@ -139,6 +143,7 @@ struct SourceAppsDetailView: View {
                     
                 }
                 .padding(.bottom, 40)
+                .frame(maxWidth: UIScreen.main.bounds.width) // قفل عرض الشاشة لمنع التمدد الخاطئ
             }
         }
         .navigationBarTitleDisplayMode(.inline)
@@ -158,16 +163,16 @@ struct SourceAppsDetailView: View {
     var standardIcon: some View {
         Image(systemName: "app.fill")
             .resizable()
-            .frame(width: 120, height: 120)
+            .frame(width: 110, height: 110)
             .foregroundColor(.purple.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 }
 
 // MARK: - Extension: UI Components
 extension SourceAppsDetailView {
     
-    // شريط الإحصائيات الأفقي الجديد
+    // شريط الإحصائيات الأفقي الجديد مع حماية حجم النص
     @ViewBuilder
     private func _horizontalStatsRow() -> some View {
         HStack(spacing: 0) {
@@ -180,7 +185,6 @@ extension SourceAppsDetailView {
         .padding(.vertical, 16)
         .background(Color.white.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 20)
     }
     
     @ViewBuilder
@@ -189,43 +193,56 @@ extension SourceAppsDetailView {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(.gray)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8) // تصغير النص بدل دفعه للخارج
+            
             Text(value)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8) // تصغير النص بدل دفعه للخارج
         }
         .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
     }
     
     @ViewBuilder
     private func _glassSection<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
-                .font(.system(size: 20, weight: .bold))
+                .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, 4)
             
             content()
-                .padding(20)
+                .padding(18)
                 .background(Color(UIColor.secondarySystemGroupedBackground).opacity(0.4))
                 .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.white.opacity(0.08), lineWidth: 1))
-                .padding(.horizontal, 20)
         }
+        .padding(.horizontal, 16)
     }
     
     @ViewBuilder
     private func _infoRow(title: String, value: String) -> some View {
         HStack {
-            Text(title).foregroundColor(.gray).font(.system(size: 15, weight: .medium))
+            Text(title)
+                .foregroundColor(.gray)
+                .font(.system(size: 14, weight: .medium))
+                .lineLimit(1)
             Spacer()
-            Text(value).foregroundColor(.white).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+            Text(value)
+                .foregroundColor(.white)
+                .font(.system(size: 14, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
     }
     
     @ViewBuilder
     private func _screenshots(screenshotURLs: [URL]) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 ForEach(screenshotURLs.indices, id: \.self) { index in
                     let url = screenshotURLs[index]
                     LazyImage(url: url) { state in
@@ -233,8 +250,8 @@ extension SourceAppsDetailView {
                             image
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
-                                .frame(height: 280)
-                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                .frame(height: 240)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                                 .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 3)
                                 .onTapGesture {
                                     _selectedScreenshotIndex = index
@@ -245,6 +262,5 @@ extension SourceAppsDetailView {
                 }
             }
         }
-        .padding(.horizontal, -20)
     }
 }
