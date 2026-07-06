@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samsam on 7/25/25.
-//  Modified for Hassany Store (Crash-Free Auto-Sign Pipeline)
+//  Modified for Hassany Store (Crash-Free Auto-Sign Signal)
 //
 
 import SwiftUI
@@ -11,12 +11,10 @@ import Combine
 import AltSourceKit
 import NimbleViews
 import UserNotifications
-import CoreData
 
 struct DownloadButtonView: View {
     let app: ASRepository.App
     @ObservedObject private var downloadManager = DownloadManager.shared
-    @Environment(\.managedObjectContext) private var viewContext
 
     @State private var downloadProgress: Double = 0
     @State private var cancellable: AnyCancellable?
@@ -30,7 +28,7 @@ struct DownloadButtonView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                         .scaleEffect(0.8)
-                    Text("جاري التوقيع...")
+                    Text("جاري التجهيز...")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundColor(.white)
                 }
@@ -115,78 +113,45 @@ struct DownloadButtonView: View {
         cancellable = publisher.sink { _, _ in
             downloadProgress = download.overallProgress
             
+            // عند اكتمال التحميل نطلق الإشارة
             if downloadProgress >= 1.0 && !hasTriggeredAutomation {
                 hasTriggeredAutomation = true
-                startRealAutoSign()
+                triggerAutoInstallSignal()
             }
         }
     }
     
-    // MARK: - الخطوة 1: بدء الأتمتة
-    private func startRealAutoSign() {
+    // MARK: - إطلاق إشارة التوقيع المخفية
+    private func triggerAutoInstallSignal() {
         isSigning = true
         let appName = app.currentName
         
         Task {
-            // ننتظر ثانيتين حتى النظام يستوعب نزول التطبيق للمكتبة
+            // انتظار بسيط لترتيب الملفات
             try? await Task.sleep(nanoseconds: 2_000_000_000)
-            await fetchFromDatabase(appName: appName)
-        }
-    }
-    
-    // MARK: - الخطوة 2: البحث في قاعدة البيانات بشكل آمن
-    @MainActor
-    private func fetchFromDatabase(appName: String) {
-        // استخدمنا NSManagedObject لخدعة المترجم ومنعه من الانهيار
-        let request = NSFetchRequest<NSManagedObject>(entityName: "App")
-        request.predicate = NSPredicate(format: "name == %@", appName)
-        
-        do {
-            let results = try viewContext.fetch(request)
-            if let realApp = results.first {
-                executeSigning(databaseObject: realApp)
-            } else {
+            
+            await MainActor.run {
+                // إرسال إشارة مخفية لقسم التوقيع حتى يشتغل بالخلفية
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("HassanyStoreAutoSignRequest"),
+                    object: appName
+                )
+                
+                sendSuccessNotification(appName: appName)
                 isSigning = false
             }
-        } catch {
-            isSigning = false
         }
     }
     
-    // MARK: - الخطوة 3: التوقيع الفعلي بالخلفية
-    private func executeSigning(databaseObject: Any) {
-        Task.detached {
-            do {
-                // استدعاء الـ ViewModel بشكل آمن
-                let viewModel = await InstallerStatusViewModel()
-                
-                // تحويل الكائن بمرونة لتجنب أخطاء "any App"
-                let handler = await ArchiveHandler(app: databaseObject as! (any App), viewModel: viewModel)
-                
-                try await handler.move()
-                let _ = try await handler.archive()
-                
-                await MainActor.run {
-                    self.sendSuccessNotification()
-                    self.isSigning = false
-                }
-            } catch {
-                await MainActor.run {
-                    self.isSigning = false
-                }
-            }
-        }
-    }
-    
-    // MARK: - الخطوة 4: الإشعارات
+    // MARK: - الإشعارات
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
     }
     
-    private func sendSuccessNotification() {
+    private func sendSuccessNotification(appName: String) {
         let content = UNMutableNotificationContent()
         content.title = "Hassany Store"
-        content.body = "اكتمل توقيع وتثبيت \(app.currentName)، يمكنك العثور عليه الآن."
+        content.body = "اكتمل تحميل \(appName)، انتقل لقسم التوقيع لتثبيته بنقرة واحدة."
         content.sound = UNNotificationSound.default
         
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
