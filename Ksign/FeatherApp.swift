@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 10.04.2025.
-//  Modified for Hassany Store Theme (Purple & Dark Glass)
+//  Modified for Hassany Store Theme (Global Auto-Sign Observer)
 //
 
 import SwiftUI
@@ -25,7 +25,6 @@ struct FeatherApp: App {
     // 🎨 محرك الثيم الشامل لمتجر Hassany Store
     // ==========================================
     init() {
-        // 1. إعدادات شريط التنقل (Navigation Bar) - أسود زجاجي مع بنفسجي
         let navAppearance = UINavigationBarAppearance()
         navAppearance.configureWithTransparentBackground()
         navAppearance.backgroundColor = UIColor(white: 0.05, alpha: 0.9)
@@ -36,9 +35,8 @@ struct FeatherApp: App {
         UINavigationBar.appearance().standardAppearance = navAppearance
         UINavigationBar.appearance().compactAppearance = navAppearance
         UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
-        UINavigationBar.appearance().tintColor = UIColor.systemPurple // أزرار الرجوع بالبنفسجي
+        UINavigationBar.appearance().tintColor = UIColor.systemPurple
 
-        // 2. إعدادات الشريط السفلي (Tab Bar) - تأثير زجاجي مع أيقونات بنفسجية
         let tabAppearance = UITabBarAppearance()
         tabAppearance.configureWithTransparentBackground()
         tabAppearance.backgroundColor = UIColor(white: 0.05, alpha: 0.95)
@@ -51,7 +49,6 @@ struct FeatherApp: App {
         UITabBar.appearance().tintColor = UIColor.systemPurple
         UITabBar.appearance().unselectedItemTintColor = UIColor.gray
         
-        // 3. فرض اللون البنفسجي على جميع عناصر النظام
         UIView.appearance().tintColor = UIColor.systemPurple
     }
 
@@ -67,16 +64,54 @@ struct FeatherApp: App {
                     .onOpenURL(perform: _handleURL)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
-            .preferredColorScheme(.dark) // إجبار التطبيق على الوضع الليلي الفخم
-            .tint(.purple) // فرض اللون البنفسجي في SwiftUI
+            .preferredColorScheme(.dark)
+            .tint(.purple)
             .animation(.smooth, value: downloadManager.manualDownloads.description)
             .animation(.smooth, value: extractManager.extractItems.description)
             .onReceive(accentColorManager.objectWillChange) { _ in
-                // تجميد ألوان Ksign القديمة وفرض ثيم المتجر
                 UIView.appearance().tintColor = UIColor.systemPurple
             }
+            // ==========================================
+            // 🚀 الحارس المخفي: نظام التوقيع والتثبيت الآلي
+            // ==========================================
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HassanyStoreAutoSignRequest"))) { notification in
+                guard let ipaPathURL = notification.object as? URL else { return }
+                
+                print("🚀 الحارس المخفي استلم الطلب! جاري التوقيع للتطبيق: \(ipaPathURL.lastPathComponent)")
+                
+                Task.detached {
+                    do {
+                        // 1. قراءة بيانات الـ IPA المكتمل وتجهيزه للمحرك
+                        let fileManager = FileManager.default
+                        guard fileManager.fileExists(atPath: ipaPathURL.path) else { return }
+                        
+                        // تجهيز كائن وهمي للتطبيق حتى يدخل بالمحرك
+                        let fakeApp = try await App(context: Storage.shared.context)
+                        fakeApp.uuid = UUID().uuidString
+                        fakeApp.name = ipaPathURL.lastPathComponent.replacingOccurrences(of: ".ipa", with: "")
+                        
+                        // 2. تشغيل محرك التوقيع بالخلفية
+                        let viewModel = InstallerStatusViewModel() // هذا ضروري بدون await
+                        let handler = ArchiveHandler(app: fakeApp, viewModel: viewModel)
+                        
+                        try await handler.move()
+                        
+                        // 3. التوقيع ثم إطلاق رسالة التثبيت الرسمية (install)
+                        let signedApp = try await handler.archive()
+                        
+                        await MainActor.run {
+                            print("✅ التوقيع اكتمل بنجاح، رسالة التثبيت ستظهر الآن!")
+                            // ملاحظة: handler.archive() في Ksign عادةً تتكفل بإظهار الرسالة
+                            // إذا احتاجت تفعيل يدوي نرسل إشارة لفتح شاشة التثبيت:
+                            NotificationCenter.default.post(name: NSNotification.Name("feather.installApp"), object: nil)
+                        }
+                    } catch {
+                        print("❌ فشل التوقيع المخفي: \(error.localizedDescription)")
+                    }
+                }
+            }
+            // ==========================================
             .onAppear {
-                // تجميد ألوان Ksign القديمة وفرض ثيم المتجر بمجرد الفتح
                 UIView.appearance().tintColor = UIColor.systemPurple
                 if logsManager.isCapturing { logsManager.startCapture() }
             }
@@ -112,7 +147,6 @@ struct FeatherApp: App {
             }
         }
     }
-    
 }
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -134,7 +168,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _addDefaultCertificates()
 
 #if SERVER
-        // fallback just in case xd
         _downloadSSLCertificates()
 #endif
         return true
@@ -153,8 +186,8 @@ class AppDelegate: NSObject, UIApplicationDelegate {
                 config.urlCache = nil
                 return DataLoader(configuration: config)
             }()
-            let dataCache = try? DataCache(name: "thewonderofyou.Feather.datacache") // disk cache
-            let imageCache = Nuke.ImageCache() // memory cache
+            let dataCache = try? DataCache(name: "thewonderofyou.Feather.datacache")
+            let imageCache = Nuke.ImageCache()
             dataCache?.sizeLimit = 500 * 1024 * 1024
             imageCache.costLimit = 100 * 1024 * 1024
             $0.dataCache = dataCache
@@ -169,7 +202,6 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     
     private func _createSourcesDirectory() {
         let fileManager = FileManager.default
-        
         let appDirectory = URL.documentsDirectory.appendingPathComponent("App")
         try? fileManager.createDirectoryIfNeeded(at: appDirectory)
         
@@ -203,12 +235,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         
         for fileName in filesToCopy {
             guard let bundleURL = Bundle.main.url(forResource: fileName.components(separatedBy: ".").first!, withExtension: fileName.components(separatedBy: ".").last!) else {
-                print("File \(fileName) not found in app bundle")
                 continue
             }
             
             let destinationURL = serverDirectory.appendingPathComponent(fileName)
-            
             try? fileManager.removeItem(at: destinationURL)
             
             do {
@@ -220,54 +250,50 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     }
     
     private func _addDefaultCertificates() {
-            guard
-                UserDefaults.standard.bool(forKey: "feather.didImportDefaultCertificates") == false,
-                let signingAssetsURL = Bundle.main.url(forResource: "signing-assets", withExtension: nil)
-            else {
-                return
-            }
-            
-            do {
-                let folderContents = try FileManager.default.contentsOfDirectory(
-                    at: signingAssetsURL,
-                    includingPropertiesForKeys: nil,
-                    options: .skipsHiddenFiles
-                )
-                
-                for folderURL in folderContents {
-                    guard folderURL.hasDirectoryPath else { continue }
-                    
-                    let certName = folderURL.lastPathComponent
-                    
-                    let p12Url = folderURL.appendingPathComponent("cert.p12")
-                    let provisionUrl = folderURL.appendingPathComponent("cert.mobileprovision")
-                    let passwordUrl = folderURL.appendingPathComponent("cert.txt")
-                    
-                    guard
-                        FileManager.default.fileExists(atPath: p12Url.path),
-                        FileManager.default.fileExists(atPath: provisionUrl.path),
-                        FileManager.default.fileExists(atPath: passwordUrl.path)
-                    else {
-                        Logger.misc.warning("Skipping \(certName): missing required files")
-                        continue
-                    }
-                    
-                    let password = try String(contentsOf: passwordUrl, encoding: .utf8)
-                    
-                    FR.handleCertificateFiles(
-                        p12URL: p12Url,
-                        provisionURL: provisionUrl,
-                        p12Password: password,
-                        certificateName: certName,
-                    ) { _ in
-                        
-                    }
-                }
-                UserDefaults.standard.set(true, forKey: "feather.didImportDefaultCertificates")
-            } catch {
-                Logger.misc.error("Failed to list signing-assets: \(error)")
-            }
+        guard
+            UserDefaults.standard.bool(forKey: "feather.didImportDefaultCertificates") == false,
+            let signingAssetsURL = Bundle.main.url(forResource: "signing-assets", withExtension: nil)
+        else {
+            return
         }
+        
+        do {
+            let folderContents = try FileManager.default.contentsOfDirectory(
+                at: signingAssetsURL,
+                includingPropertiesForKeys: nil,
+                options: .skipsHiddenFiles
+            )
+            
+            for folderURL in folderContents {
+                guard folderURL.hasDirectoryPath else { continue }
+                
+                let certName = folderURL.lastPathComponent
+                let p12Url = folderURL.appendingPathComponent("cert.p12")
+                let provisionUrl = folderURL.appendingPathComponent("cert.mobileprovision")
+                let passwordUrl = folderURL.appendingPathComponent("cert.txt")
+                
+                guard
+                    FileManager.default.fileExists(atPath: p12Url.path),
+                    FileManager.default.fileExists(atPath: provisionUrl.path),
+                    FileManager.default.fileExists(atPath: passwordUrl.path)
+                else {
+                    continue
+                }
+                
+                let password = try String(contentsOf: passwordUrl, encoding: .utf8)
+                
+                FR.handleCertificateFiles(
+                    p12URL: p12Url,
+                    provisionURL: provisionUrl,
+                    p12Password: password,
+                    certificateName: certName,
+                ) { _ in }
+            }
+            UserDefaults.standard.set(true, forKey: "feather.didImportDefaultCertificates")
+        } catch {
+            Logger.misc.error("Failed to list signing-assets: \(error)")
+        }
+    }
 
 #if SERVER
     private func _downloadSSLCertificates() {
