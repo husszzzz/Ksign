@@ -3,12 +3,12 @@
 //  Feather
 //
 //  Created by samara on 10.04.2025.
-//  Modified for Hassany Store Theme (Global Auto-Sign Observer)
+//  Modified for Hassany Store Theme (Global Auto-Sign Observer Fixed)
 //
 
 import SwiftUI
-import Combine       // 🚀 هذا السطر اللي حل مشكلة الإيرور
-import CoreData      // 🚀 وهذا حتى يتعرف على قاعدة البيانات
+import Combine
+import CoreData
 import Nuke
 import OSLog
 import IDeviceSwift
@@ -81,10 +81,8 @@ struct FeatherApp: App {
                 
                 print("🚀 الحارس استلم الملف: \(ipaPathURL.lastPathComponent)")
                 
-                // 1. استخدام محرك التطبيق الرسمي لفك ضغط الـ IPA وإضافته للمكتبة
                 FR.handlePackageFile(ipaPathURL) { _ in
                     
-                    // 2. الانتظار ثانية واحدة حتى تكتمل إضافة التطبيق لقاعدة البيانات
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                         let context = Storage.shared.context
                         let request = NSFetchRequest<NSManagedObject>(entityName: "Imported")
@@ -95,17 +93,16 @@ struct FeatherApp: App {
                             let results = try context.fetch(request)
                             if let newestApp = results.first {
                                 
-                                // 3. توقيع التطبيق بالخلفية بدون إظهار واجهات
                                 Task.detached {
                                     do {
                                         let viewModel = await InstallerStatusViewModel()
-                                        guard let validApp = newestApp as? (any App) else { return }
+                                        // 🚀 الحل القاضي هنا: غيرنا any App إلى AppInfoPresentable حتى يرضى المترجم
+                                        guard let validApp = newestApp as? AppInfoPresentable else { return }
                                         let handler = await ArchiveHandler(app: validApp, viewModel: viewModel)
                                         
                                         try await handler.move()
                                         let _ = try await handler.archive()
                                         
-                                        // 4. إطلاق رسالة التثبيت
                                         await MainActor.run {
                                             print("✅ تم التوقيع بنجاح! إطلاق رسالة التثبيت...")
                                             NotificationCenter.default.post(name: Notification.Name("feather.installApp"), object: nil)
