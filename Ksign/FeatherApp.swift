@@ -7,6 +7,8 @@
 //
 
 import SwiftUI
+import Combine       // 🚀 هذا السطر اللي حل مشكلة الإيرور
+import CoreData      // 🚀 وهذا حتى يتعرف على قاعدة البيانات
 import Nuke
 import OSLog
 import IDeviceSwift
@@ -72,41 +74,50 @@ struct FeatherApp: App {
                 UIView.appearance().tintColor = UIColor.systemPurple
             }
             // ==========================================
-            // 🚀 الحارس المخفي: نظام التوقيع والتثبيت الآلي
+            // 🚀 الحارس المخفي: التوقيع والتثبيت الآلي الآمن
             // ==========================================
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HassanyStoreAutoSignRequest"))) { notification in
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HassanyStoreAutoSignRequest"))) { notification in
                 guard let ipaPathURL = notification.object as? URL else { return }
                 
-                print("🚀 الحارس المخفي استلم الطلب! جاري التوقيع للتطبيق: \(ipaPathURL.lastPathComponent)")
+                print("🚀 الحارس استلم الملف: \(ipaPathURL.lastPathComponent)")
                 
-                Task.detached {
-                    do {
-                        // 1. قراءة بيانات الـ IPA المكتمل وتجهيزه للمحرك
-                        let fileManager = FileManager.default
-                        guard fileManager.fileExists(atPath: ipaPathURL.path) else { return }
+                // 1. استخدام محرك التطبيق الرسمي لفك ضغط الـ IPA وإضافته للمكتبة
+                FR.handlePackageFile(ipaPathURL) { _ in
+                    
+                    // 2. الانتظار ثانية واحدة حتى تكتمل إضافة التطبيق لقاعدة البيانات
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        let context = Storage.shared.context
+                        let request = NSFetchRequest<NSManagedObject>(entityName: "Imported")
+                        request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+                        request.fetchLimit = 1
                         
-                        // تجهيز كائن وهمي للتطبيق حتى يدخل بالمحرك
-                        let fakeApp = try await App(context: Storage.shared.context)
-                        fakeApp.uuid = UUID().uuidString
-                        fakeApp.name = ipaPathURL.lastPathComponent.replacingOccurrences(of: ".ipa", with: "")
-                        
-                        // 2. تشغيل محرك التوقيع بالخلفية
-                        let viewModel = InstallerStatusViewModel() // هذا ضروري بدون await
-                        let handler = ArchiveHandler(app: fakeApp, viewModel: viewModel)
-                        
-                        try await handler.move()
-                        
-                        // 3. التوقيع ثم إطلاق رسالة التثبيت الرسمية (install)
-                        let signedApp = try await handler.archive()
-                        
-                        await MainActor.run {
-                            print("✅ التوقيع اكتمل بنجاح، رسالة التثبيت ستظهر الآن!")
-                            // ملاحظة: handler.archive() في Ksign عادةً تتكفل بإظهار الرسالة
-                            // إذا احتاجت تفعيل يدوي نرسل إشارة لفتح شاشة التثبيت:
-                            NotificationCenter.default.post(name: NSNotification.Name("feather.installApp"), object: nil)
+                        do {
+                            let results = try context.fetch(request)
+                            if let newestApp = results.first {
+                                
+                                // 3. توقيع التطبيق بالخلفية بدون إظهار واجهات
+                                Task.detached {
+                                    do {
+                                        let viewModel = await InstallerStatusViewModel()
+                                        guard let validApp = newestApp as? (any App) else { return }
+                                        let handler = await ArchiveHandler(app: validApp, viewModel: viewModel)
+                                        
+                                        try await handler.move()
+                                        let _ = try await handler.archive()
+                                        
+                                        // 4. إطلاق رسالة التثبيت
+                                        await MainActor.run {
+                                            print("✅ تم التوقيع بنجاح! إطلاق رسالة التثبيت...")
+                                            NotificationCenter.default.post(name: Notification.Name("feather.installApp"), object: nil)
+                                        }
+                                    } catch {
+                                        print("❌ حدث خطأ أثناء التوقيع: \(error)")
+                                    }
+                                }
+                            }
+                        } catch {
+                            print("❌ لم يتم العثور على التطبيق في البيانات.")
                         }
-                    } catch {
-                        print("❌ فشل التوقيع المخفي: \(error.localizedDescription)")
                     }
                 }
             }
