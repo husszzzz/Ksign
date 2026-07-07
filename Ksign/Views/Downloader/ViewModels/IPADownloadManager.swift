@@ -1,8 +1,8 @@
-//
 //  IPADownloadManager.swift
 //  Ksign
 //
 //  Created by Nagata Asami on 5/24/25.
+//  Modified for Hassany Store (Core Auto-Sign Trigger)
 //
 
 import SwiftUI
@@ -42,25 +42,19 @@ class IPADownloadManager: NSObject, ObservableObject {
 
     func loadDownloadedIPAs() {
         let fileManager = FileManager.default
-        
         let downloadDirectory = URL.documentsDirectory.appendingPathComponent("Downloads")
-        
         
         let activeDownloads = downloadItems.filter { !$0.isFinished }
         downloadItems.removeAll()
-        
         downloadItems.append(contentsOf: activeDownloads)
         
         do {
             try fileManager.createDirectoryIfNeeded(at: downloadDirectory)
-            
             let fileURLs = try fileManager.contentsOfDirectory(at: downloadDirectory, includingPropertiesForKeys: [.fileSizeKey], options: [])
             
             for fileURL in fileURLs {
                 if isIPAFile(fileURL) {
-                    if activeDownloads.contains(where: { $0.localPath == fileURL }) {
-                        continue
-                    }
+                    if activeDownloads.contains(where: { $0.localPath == fileURL }) { continue }
                     
                     let attributes = try fileManager.attributesOfItem(atPath: fileURL.path)
                     let fileSize = attributes[.size] as? Int64 ?? 0
@@ -77,7 +71,6 @@ class IPADownloadManager: NSObject, ObservableObject {
                     downloadItems.append(item)
                 }
             }
-            
         } catch {
             print("Failed to load downloaded IPAs: \(error)")
         }
@@ -104,18 +97,13 @@ class IPADownloadManager: NSObject, ObservableObject {
         }
         
         let task = urlSession.downloadTask(with: url)
-        
         activeDownloads[task.taskIdentifier] = item.id.uuidString
-        
         task.resume()
     }
     
-    
     func cancelDownload(_ item: DownloadItem) {
         urlSession.getAllTasks { tasks in
-            if let task = tasks.first(where: { task in
-                self.activeDownloads[task.taskIdentifier] == item.id.uuidString
-            }) {
+            if let task = tasks.first(where: { self.activeDownloads[$0.taskIdentifier] == item.id.uuidString }) {
                 task.cancel()
             }
         }
@@ -180,8 +168,7 @@ class IPADownloadManager: NSObject, ObservableObject {
     }
 }
 
-    // MARK: - URLSessionDownloadDelegate
-
+// MARK: - URLSessionDownloadDelegate
 extension IPADownloadManager: URLSessionDownloadDelegate {
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         let fileManager = FileManager.default
@@ -211,6 +198,15 @@ extension IPADownloadManager: URLSessionDownloadDelegate {
                     self.downloadItems[index] = updatedItem
                 }
                 self.activeDownloads.removeValue(forKey: downloadTask.taskIdentifier)
+                
+                // ==========================================
+                // 🚀 السحر هنا: إطلاق إشارة التوقيع التلقائي
+                // ==========================================
+                print("✅ اكتمل التحميل: \(updatedItem.title).. جاري إرسال مسار التطبيق لمحرك التوقيع!")
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("HassanyStoreAutoSignRequest"),
+                    object: updatedItem.localPath // نرسل مسار ملف الـ IPA مباشرة
+                )
             }
         } catch {
             print("Error saving downloaded file: \(error)")
