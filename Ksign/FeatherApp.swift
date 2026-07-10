@@ -74,47 +74,47 @@ struct FeatherApp: App {
                 UIView.appearance().tintColor = UIColor.systemPurple
             }
             // ==========================================
-            // 🚀 الحارس المخفي: التوقيع والتثبيت الآلي الآمن
+            // 🚀 الحارس المخفي (الإصدار النهائي المستقر)
             // ==========================================
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("HassanyStoreAutoSignRequest"))) { notification in
-                guard let ipaPathURL = notification.object as? URL else { return }
+                // 1. استلام اسم التطبيق من زر التحميل
+                guard let appName = notification.object as? String else { return }
+                print("🚀 الحارس استلم إشارة توقيع التطبيق: \(appName)")
                 
-                print("🚀 الحارس استلم الملف: \(ipaPathURL.lastPathComponent)")
-                
-                FR.handlePackageFile(ipaPathURL) { _ in
+                // 2. تأخير بسيط جداً لضمان حفظ التطبيق بقاعدة البيانات
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    let context = Storage.shared.context
+                    let request = NSFetchRequest<NSManagedObject>(entityName: "Imported")
+                    request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
+                    // جلب أحدث تطبيق تم تنزيله
+                    request.fetchLimit = 1 
                     
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        let context = Storage.shared.context
-                        let request = NSFetchRequest<NSManagedObject>(entityName: "Imported")
-                        request.sortDescriptors = [NSSortDescriptor(key: "date", ascending: false)]
-                        request.fetchLimit = 1
-                        
-                        do {
-                            let results = try context.fetch(request)
-                            if let newestApp = results.first {
-                                
-                                Task.detached {
-                                    do {
-                                        let viewModel = await InstallerStatusViewModel()
-                                        // 🚀 الحل القاضي هنا: غيرنا any App إلى AppInfoPresentable حتى يرضى المترجم
-                                        guard let validApp = newestApp as? AppInfoPresentable else { return }
-                                        let handler = await ArchiveHandler(app: validApp, viewModel: viewModel)
-                                        
-                                        try await handler.move()
-                                        let _ = try await handler.archive()
-                                        
-                                        await MainActor.run {
-                                            print("✅ تم التوقيع بنجاح! إطلاق رسالة التثبيت...")
-                                            NotificationCenter.default.post(name: Notification.Name("feather.installApp"), object: nil)
-                                        }
-                                    } catch {
-                                        print("❌ حدث خطأ أثناء التوقيع: \(error)")
+                    do {
+                        let results = try context.fetch(request)
+                        if let newestApp = results.first as? AppInfoPresentable {
+                            // 3. تشغيل محرك التوقيع بالخلفية بدون إظهار الواجهة
+                            Task.detached {
+                                do {
+                                    let viewModel = await InstallerStatusViewModel()
+                                    let handler = await ArchiveHandler(app: newestApp, viewModel: viewModel)
+                                    
+                                    try await handler.move()
+                                    let _ = try await handler.archive()
+                                    
+                                    // 4. إطلاق شاشة التثبيت التلقائي
+                                    await MainActor.run {
+                                        print("✅ تم التوقيع! جاري التثبيت...")
+                                        NotificationCenter.default.post(name: Notification.Name("feather.installApp"), object: nil)
                                     }
+                                } catch {
+                                    print("❌ حدث خطأ أثناء توقيع \(appName): \(error)")
                                 }
                             }
-                        } catch {
-                            print("❌ لم يتم العثور على التطبيق في البيانات.")
+                        } else {
+                            print("⚠️ لم يتم العثور على التطبيق \(appName) في المكتبة.")
                         }
+                    } catch {
+                        print("❌ خطأ في قراءة قاعدة البيانات.")
                     }
                 }
             }
