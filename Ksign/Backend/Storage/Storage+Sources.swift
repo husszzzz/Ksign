@@ -94,24 +94,8 @@ extension Storage {
 
 	func addBuiltInSources() {
 		let builtInSourceURLs = [
-            "https://raw.githubusercontent.com/swaggyP36000/TrollStore-IPAs/main/apps_esign.json",
-            "https://apps.altstore.io",
-            "https://alts.lao.sb",
-            "https://quarksources.github.io/dist/quantumsource%2B%2B.min.json",
-            "https://wuxu1.github.io/wuxu-complete-plus.json",
-            "https://repository.apptesters.org/apps.json",
-            "https://community-apps.sidestore.io/sidecommunity.json",
-            "https://flyinghead.github.io/flycast-builds/altstore.json",
-            "https://pokemmo.com/altstore/",
-            "https://theodyssey.dev/altstore/odysseysource.json",
-            "https://taurine.app/altstore/taurinestore.json",
-            "https://randomblock1.com/altstore/apps.json",
-            "https://provenance-emu.com/apps.json",
-            "https://fastsign.dev/repo.json",
-            "https://repository.apptesters.org/apps.json",
-            "https://altstore.oatmealdome.me/",
-            "https://ipa.cypwn.xyz/cypwn.json",
-            "https://ish.app/altstore.json"
+            
+            "https://fastsign.dev/repo.json"
 		]
 		
 		for urlString in builtInSourceURLs {
