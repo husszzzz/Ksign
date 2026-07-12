@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Clean Grid UI, Removed Categories)
+//  Modified for Hassany Store (Clean Grid UI, Newest Apps First)
 //
 
 import SwiftUI
@@ -56,7 +56,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // الفلترة والترتيب (البحث فقط، تم حذف الأقسام)
+    // الفلترة والترتيب (البحث فقط، الأحدث يظهر أولاً)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
@@ -66,6 +66,9 @@ struct SourceAppsView: View {
                 all.append(SourceAppRoute(source: source, app: app))
             }
         }
+        
+        // 🚀 السحر هنا: نعكس القائمة بالكامل حتى يظهر آخر تطبيق انضاف بالسورس في القمة!
+        all.reverse()
         
         let currentSearch = _searchText.lowercased()
         if !currentSearch.isEmpty {
@@ -77,13 +80,14 @@ struct SourceAppsView: View {
         
         let sortOpt = _sortOption
         let asc = _sortAscending
-        all.sort { a, b in
-            let nameA = a.app.name ?? ""
-            let nameB = b.app.name ?? ""
-            if sortOpt == .name {
+        
+        // الترتيب حسب الاسم (فقط إذا اختار المستخدم الفلتر يدوياً)
+        if sortOpt == .name {
+            all.sort { a, b in
+                let nameA = a.app.name ?? ""
+                let nameB = b.app.name ?? ""
                 return asc ? (nameA < nameB) : (nameA > nameB)
             }
-            return true
         }
         
         return all
