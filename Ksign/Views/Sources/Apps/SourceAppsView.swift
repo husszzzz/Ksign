@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Clean Grid UI, Newest Apps First)
+//  Modified for Hassany Store (Clean Grid UI, Safe Reverse Sorting)
 //
 
 import SwiftUI
@@ -56,7 +56,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // الفلترة والترتيب (البحث فقط، الأحدث يظهر أولاً)
+    // الفلترة والترتيب (الترتيب الآمن: الأحدث يظهر أولاً)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
@@ -67,8 +67,8 @@ struct SourceAppsView: View {
             }
         }
         
-        // 🚀 السحر هنا: نعكس القائمة بالكامل حتى يظهر آخر تطبيق انضاف بالسورس في القمة!
-        all.reverse()
+        // 🚀 الترتيب الآمن: نعكس المصفوفة في الذاكرة المؤقتة فقط لعرض الأحدث بالقمة
+        all = all.reversed()
         
         let currentSearch = _searchText.lowercased()
         if !currentSearch.isEmpty {
@@ -115,7 +115,7 @@ struct SourceAppsView: View {
                         }
                         .padding(.horizontal, 16)
                         
-                        // 3. شبكة التطبيقات (بدون الفلاتر)
+                        // 3. شبكة التطبيقات
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
                             ForEach(_filteredApps, id: \.id) { route in
                                 Button(action: {
