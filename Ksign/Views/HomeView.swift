@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, Flawless Standalone Logic)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, Perfect Infinite Marquee)
 //
 
 import SwiftUI
@@ -21,8 +21,7 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    // 🚀 المحرك الخاص بالشاشة (يعمل بصمت بدون التأثير على باقي التطبيق)
-    @StateObject private var viewModel = SourcesViewModel()
+    @ObservedObject var viewModel: SourcesViewModel
     
     @FetchRequest(
         entity: AltSource.entity(),
@@ -68,7 +67,7 @@ struct HomeView: View {
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
-                            // 2. زر VIP
+                            // 2. زر VIP (بدون حدود خايسة)
                             NavigationLink(destination: VIPPackagesView()) {
                                 CleanVIPButton()
                             }
@@ -84,9 +83,9 @@ struct HomeView: View {
                             } else if top10Apps.isEmpty {
                                 Text("لا توجد تطبيقات حالياً.").foregroundColor(.gray).padding(.top, 40)
                             } else {
-                                VStack(alignment: .leading, spacing: 25) {
+                                VStack(alignment: .leading, spacing: 30) {
                                     
-                                    // السطر الأول
+                                    // ---- السطر الأول (أحدث الإضافات) ----
                                     VStack(alignment: .leading, spacing: 15) {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
@@ -99,12 +98,16 @@ struct HomeView: View {
                                         ContinuousMarquee(apps: top10Apps, moveLeft: true)
                                     }
                                     
-                                    // السطر الثاني
+                                    // ---- السطر الثاني (آخر التحديثات) ----
                                     if !bottom10Apps.isEmpty {
                                         VStack(alignment: .leading, spacing: 15) {
                                             HStack {
                                                 Text("آخر التحديثات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                                 Spacer()
+                                                // 🚀 إضافة اكتشف المزيد للسطر الثاني
+                                                NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
+                                                    Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
+                                                }
                                             }.padding(.horizontal, 20)
                                             
                                             ContinuousMarquee(apps: bottom10Apps, moveLeft: false)
@@ -124,7 +127,6 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
-                    // 🚀 السحر هنا: تأخير ثانية ونص يمنع تضارب قاعدة البيانات نهائياً
                     Task {
                         try? await Task.sleep(nanoseconds: 1_500_000_000)
                         await viewModel.fetchSources(_allSources, refresh: false)
@@ -134,11 +136,9 @@ struct HomeView: View {
                         }
                     }
                 } else {
-                    // تحديث فوري عند الرجوع للصفحة
                     self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                 }
             }
-            // 🚀 يلقط التطبيقات تلقائياً إذا تأخرت
             .onChange(of: _allSources.count) { _ in
                 self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                 if !self.loadedRepositories.isEmpty { self.isAppsLoading = false }
@@ -164,40 +164,65 @@ struct HomeView: View {
     }
 }
 
-// MARK: - 🚀 محرك الحركة المستمرة (Marquee Effect)
+// MARK: - 🚀 محرك الحركة المستمرة (الخرافي - بدون توقف أو اختفاء)
 struct ContinuousMarquee: View {
     let apps: [HomeAppRoute]
     let moveLeft: Bool
-    @State private var animate = false
+    
+    @State private var offset: CGFloat = 0
+    @State private var isPaused: Bool = false
+    
+    // المؤقت المسؤول عن نعومة الحركة (يعادل 60 فريم)
+    let timer = Timer.publish(every: 0.015, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        let itemWidth: CGFloat = 146
+        let itemWidth: CGFloat = 146 // 130 عرض + 16 مسافة
         let totalWidth = itemWidth * CGFloat(apps.count)
+        
+        // تكرار التطبيقات 3 مرات لضمان عدم ظهور أي فراغ أو انقطاع
+        let extendedApps = apps + apps + apps
         
         GeometryReader { proxy in
             HStack(spacing: 16) {
-                ForEach(0..<6, id: \.self) { loopIndex in
-                    ForEach(apps, id: \.id) { route in
-                        NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) {
-                            GlassAppCard(app: route.app)
-                        }
-                        .buttonStyle(.plain)
-                        // 🚀 معرف فريد يمنع تداخل الكروت
-                        .id("\(loopIndex)-\(route.id)")
+                ForEach(Array(extendedApps.enumerated()), id: \.offset) { index, route in
+                    NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) {
+                        GlassAppCard(app: route.app)
                     }
+                    .buttonStyle(.plain)
+                    .id("\(index)-\(route.id)")
                 }
             }
             .environment(\.layoutDirection, .leftToRight)
-            .offset(x: animate ? (moveLeft ? -totalWidth : 0) : (moveLeft ? 0 : -totalWidth))
+            .offset(x: offset)
+            .onReceive(timer) { _ in
+                // 🚀 إذا داس المستخدم، يوكف الحركة. وإذا شال إيده، ترجع!
+                guard !isPaused, totalWidth > 0 else { return }
+                
+                if moveLeft {
+                    offset -= 1.0 // سرعة الحركة
+                    if offset <= -totalWidth {
+                        offset += totalWidth // إعادة الشريط بنعومة بدون ما يحس المستخدم
+                    }
+                } else {
+                    offset += 1.0
+                    if offset >= 0 {
+                        offset -= totalWidth
+                    }
+                }
+            }
+            // 🚀 أمر التوقف عند اللمس (يسمح بفتح التطبيق بنفس الوقت)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in isPaused = true }
+                    .onEnded { _ in isPaused = false }
+            )
         }
         .frame(height: 160)
         .clipped()
         .onAppear {
-            animate = false
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.linear(duration: Double(apps.count) * 2.5).repeatForever(autoreverses: false)) {
-                    animate = true
-                }
+            // تهيئة اتجاه البداية للسطر الثاني
+            if !moveLeft {
+                offset = -totalWidth
             }
         }
     }
@@ -309,7 +334,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP النظيف
+// MARK: - زر VIP النظيف (تم إزالة الحدود الخايسة)
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
@@ -317,11 +342,12 @@ struct CleanVIPButton: View {
             VStack(alignment: .leading, spacing: 4) { Text("الترقية إلى VIP").font(.system(size: 18, weight: .bold)).foregroundColor(.white); Text("اكتشف الباقة النارية والمميزات الحصرية").font(.system(size: 13, weight: .medium)).foregroundColor(.gray) }
             Spacer()
             Image(systemName: "chevron.left").foregroundColor(.gray.opacity(0.6))
-        }.padding(20).background(Color(white: 0.08)).clipShape(RoundedRectangle(cornerRadius: 18)).overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1)).padding(.horizontal, 20)
+        }
+        .padding(20).background(Color(white: 0.1)).clipShape(RoundedRectangle(cornerRadius: 18)).padding(.horizontal, 20)
     }
 }
 
-// MARK: - كارت التطبيق
+// MARK: - كارت التطبيق (نظيف وبدون حدود)
 struct GlassAppCard: View {
     let app: ASRepository.App
     var body: some View {
@@ -340,6 +366,6 @@ struct GlassAppCard: View {
                 }
             }
             Text("تنزيل").font(.system(size: 13, weight: .bold)).foregroundColor(.white).frame(width: 80, height: 28).background(Color.white.opacity(0.15)).clipShape(Capsule())
-        }.padding(.vertical, 16).padding(.horizontal, 12).frame(width: 130).background(Color(white: 0.06)).clipShape(RoundedRectangle(cornerRadius: 24))
+        }.padding(.vertical, 16).padding(.horizontal, 12).frame(width: 130).background(Color(white: 0.1)).clipShape(RoundedRectangle(cornerRadius: 24))
     }
 }
