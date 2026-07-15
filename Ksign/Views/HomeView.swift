@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI)
+//  Feather (Modified for Hassany Store - Elite Xsing UI Fixes)
 //
 
 import SwiftUI
@@ -34,27 +34,29 @@ struct HomeView: View {
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
+    // 🚀 متغيرات جديدة لحل مشكلة التعليق
+    @State private var loadedRepositories: [ASRepository] = []
+    @State private var isAppsLoading = true
+    
     let timer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     
-    // 🚀 جلب جميع التطبيقات مرتبة من الأحدث للأقدم
+    // جلب جميع التطبيقات مرتبة
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
-        for source in _allSources {
-            if let repo = viewModel.sources[source] {
-                for app in repo.apps {
-                    all.append(HomeAppRoute(source: repo, app: app))
-                }
+        for repo in loadedRepositories {
+            for app in repo.apps {
+                all.append(HomeAppRoute(source: repo, app: app))
             }
         }
         return all.reversed()
     }
     
-    // 🚀 أول 20 تطبيق للشاشة الرئيسية (يفترون)
+    // أول 20 تطبيق
     private var top20Apps: [HomeAppRoute] {
         return Array(allAppsSorted.prefix(20))
     }
     
-    // أول 50 تطبيق لصفحة "اكتشف المزيد"
+    // أول 50 تطبيق لصفحة المزيد
     private var top50Apps: [HomeAppRoute] {
         return Array(allAppsSorted.prefix(50))
     }
@@ -65,7 +67,7 @@ struct HomeView: View {
                 Color.black.ignoresSafeArea()
                 
                 if showIntro {
-                    // الإنترو الجديد الخرافي
+                    // الإنترو المعدل
                     XsingIntroView(showIntro: $showIntro)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
@@ -81,13 +83,18 @@ struct HomeView: View {
                             }
                             .buttonStyle(.plain)
                             
-                            // 3. شريط أحدث 20 تطبيق (يتحرك تلقائياً)
-                            if top20Apps.isEmpty {
+                            // 3. شريط أحدث 20 تطبيق
+                            if isAppsLoading {
+                                // شاشة التحميل (تختفي فور انتهاء الجلب)
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
                                     Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
+                            } else if top20Apps.isEmpty {
+                                Text("لا توجد تطبيقات حالياً.")
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 40)
                             } else {
                                 VStack(alignment: .leading, spacing: 15) {
                                     HStack {
@@ -139,16 +146,29 @@ struct HomeView: View {
             .onAppear {
                 if !hasLoadedOnce {
                     Task {
+                        // تشغيل جلب التطبيقات
                         await viewModel.fetchSources(_allSources, refresh: false)
                         await fetchBannersJSON()
-                        hasLoadedOnce = true
+                        
+                        // 🚀 الحل القاضي: إجبار الواجهة على التحديث بعد انتهاء الجلب
+                        await MainActor.run {
+                            self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                            self.isAppsLoading = false
+                            self.hasLoadedOnce = true
+                        }
                     }
+                }
+            }
+            // مراقب إضافي في حال تأخرت البيانات
+            .onChange(of: viewModel.isFinished) { finished in
+                if finished {
+                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                    self.isAppsLoading = false
                 }
             }
         }
     }
     
-    // دالة سحب البانرات
     private func fetchBannersJSON() async {
         let defaultBanners = [
             "https://a.top4top.io/p_3837rcc760.png",
@@ -167,51 +187,51 @@ struct HomeView: View {
     }
 }
 
-// MARK: - إنترو Xsing الجديد والمطور
+// MARK: - إنترو Xsing (تم حل مشكلة اليمين واليسار)
 struct XsingIntroView: View {
     @Binding var showIntro: Bool
     
-    @State private var xScale: CGFloat = 2.0
     @State private var xOpacity: Double = 0.0
+    @State private var xScale: CGFloat = 0.3
     @State private var singOpacity: Double = 0.0
-    @State private var singOffset: CGFloat = -20
+    @State private var singOffset: CGFloat = -30
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
             
             HStack(spacing: 0) {
-                // حرف X البنفسجي
                 Text("X")
-                    .font(.system(size: 75, weight: .black, design: .rounded))
-                    .foregroundColor(Color.purple)
+                    .font(.system(size: 80, weight: .black, design: .rounded))
+                    .foregroundColor(.purple)
                     .scaleEffect(xScale)
                     .opacity(xOpacity)
                 
-                // كلمة sing اللي تطلع وراه
                 Text("sing")
                     .font(.system(size: 65, weight: .black, design: .rounded))
                     .foregroundStyle(LinearGradient(colors: [.white, .gray], startPoint: .top, endPoint: .bottom))
                     .opacity(singOpacity)
                     .offset(x: singOffset)
             }
+            // 🚀 هذا السطر يجبر النظام يقرأ من اليسار لليمين مهما كانت لغة الجهاز!
+            .environment(\.layoutDirection, .leftToRight)
         }
         .onAppear {
-            // 1. دخول حرف X بقوة
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.5)) {
+            // 1. رسم وتكبير حرف X أولاً
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 xScale = 1.0
                 xOpacity = 1.0
             }
             
-            // 2. ظهور كلمة sing بنعومة
+            // 2. ظهور كلمة sing بنعومة بعد نصف ثانية
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation(.easeOut(duration: 0.5)) {
+                withAnimation(.easeOut(duration: 0.6)) {
                     singOpacity = 1.0
                     singOffset = 0
                 }
             }
             
-            // 3. إخفاء الإنترو
+            // 3. إخفاء الإنترو بالكامل
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     showIntro = false
@@ -221,7 +241,7 @@ struct XsingIntroView: View {
     }
 }
 
-// MARK: - صفحة باقات VIP (الباقة النارية بالطول)
+// MARK: - صفحة باقات VIP (الباقة النارية)
 struct VIPPackagesView: View {
     let commonFeatures = [
         "تطبيقات معدلة حصرية وبدون إعلانات",
@@ -237,7 +257,6 @@ struct VIPPackagesView: View {
             
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 30) {
-                    // عنوان الصفحة
                     VStack(spacing: 8) {
                         Image(systemName: "crown.fill")
                             .font(.system(size: 50))
@@ -248,10 +267,7 @@ struct VIPPackagesView: View {
                     }
                     .padding(.top, 20)
                     
-                    // كارت "الباقة النارية" بالطول
                     VStack(alignment: .leading, spacing: 20) {
-                        
-                        // الهيدر (الاسم والسعر)
                         HStack {
                             Text("الباقة النارية 🔥")
                                 .font(.system(size: 24, weight: .heavy))
@@ -266,43 +282,30 @@ struct VIPPackagesView: View {
                                 .clipShape(Capsule())
                         }
                         
-                        // المدة والضمان
                         HStack(spacing: 15) {
                             HStack {
-                                Image(systemName: "calendar")
-                                    .foregroundColor(.yellow)
-                                Text("سنة كاملة")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 14, weight: .bold))
+                                Image(systemName: "calendar").foregroundColor(.yellow)
+                                Text("سنة كاملة").foregroundColor(.white).font(.system(size: 14, weight: .bold))
                             }
                             HStack {
-                                Image(systemName: "checkmark.shield.fill")
-                                    .foregroundColor(.green)
-                                Text("ضمان شهر")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 14, weight: .bold))
+                                Image(systemName: "checkmark.shield.fill").foregroundColor(.green)
+                                Text("ضمان شهر").foregroundColor(.white).font(.system(size: 14, weight: .bold))
                             }
                         }
                         
                         Divider().background(Color.white.opacity(0.3))
                         
-                        // المميزات
                         VStack(alignment: .leading, spacing: 12) {
                             ForEach(commonFeatures, id: \.self) { feature in
                                 HStack(spacing: 10) {
-                                    Image(systemName: "star.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.yellow)
-                                    Text(feature)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.white)
+                                    Image(systemName: "star.fill").font(.system(size: 12)).foregroundColor(.yellow)
+                                    Text(feature).font(.system(size: 15, weight: .medium)).foregroundColor(.white)
                                 }
                             }
                         }
                         
                         Spacer()
                         
-                        // 🚀 زر الشراء يوجه للتليكرام مباشرة
                         Link(destination: URL(string: "https://t.me/OM_G9")!) {
                             HStack {
                                 Image(systemName: "paperplane.fill")
@@ -318,9 +321,7 @@ struct VIPPackagesView: View {
                         }
                     }
                     .padding(25)
-                    .background(
-                        LinearGradient(colors: [Color.orange, Color.red], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
+                    .background(LinearGradient(colors: [Color.orange, Color.red], startPoint: .topLeading, endPoint: .bottomTrailing))
                     .clipShape(RoundedRectangle(cornerRadius: 25))
                     .shadow(color: .red.opacity(0.5), radius: 15, x: 0, y: 10)
                     .padding(.horizontal, 20)
@@ -332,7 +333,7 @@ struct VIPPackagesView: View {
     }
 }
 
-// MARK: - صفحة أحدث 50 تطبيق (Top 50 Apps)
+// MARK: - صفحة أحدث 50 تطبيق
 struct Top50AppsView: View {
     let apps: [HomeAppRoute]
     var body: some View {
@@ -384,7 +385,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP النظيف
+// MARK: - زر VIP
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
