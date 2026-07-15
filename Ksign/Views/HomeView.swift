@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI Fixes)
+//  Feather (Modified for Hassany Store - Elite Xsing UI & Infinite Marquee)
 //
 
 import SwiftUI
@@ -30,15 +30,11 @@ struct HomeView: View {
     ) private var _allSources: FetchedResults<AltSource>
     
     @State private var showIntro = true
-    @State private var currentIndex = 0
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
-    // 🚀 متغيرات جديدة لحل مشكلة التعليق
     @State private var loadedRepositories: [ASRepository] = []
     @State private var isAppsLoading = true
-    
-    let timer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     
     // جلب جميع التطبيقات مرتبة
     private var allAppsSorted: [HomeAppRoute] {
@@ -51,9 +47,17 @@ struct HomeView: View {
         return all.reversed()
     }
     
-    // أول 20 تطبيق
-    private var top20Apps: [HomeAppRoute] {
-        return Array(allAppsSorted.prefix(20))
+    // 🚀 أول 10 تطبيقات للسطر العلوي (أحدث الإضافات)
+    private var top10Apps: [HomeAppRoute] {
+        return Array(allAppsSorted.prefix(10))
+    }
+    
+    // 🚀 ثاني 10 تطبيقات للسطر السفلي (آخر التحديثات)
+    private var bottom10Apps: [HomeAppRoute] {
+        if allAppsSorted.count > 10 {
+            return Array(allAppsSorted.dropFirst(10).prefix(10))
+        }
+        return []
     }
     
     // أول 50 تطبيق لصفحة المزيد
@@ -67,7 +71,6 @@ struct HomeView: View {
                 Color.black.ignoresSafeArea()
                 
                 if showIntro {
-                    // الإنترو المعدل
                     XsingIntroView(showIntro: $showIntro)
                 } else {
                     ScrollView(.vertical, showsIndicators: false) {
@@ -83,55 +86,51 @@ struct HomeView: View {
                             }
                             .buttonStyle(.plain)
                             
-                            // 3. شريط أحدث 20 تطبيق
+                            // 3. التطبيقات المتحركة بشكل مستمر
                             if isAppsLoading {
-                                // شاشة التحميل (تختفي فور انتهاء الجلب)
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
                                     Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
-                            } else if top20Apps.isEmpty {
+                            } else if top10Apps.isEmpty {
                                 Text("لا توجد تطبيقات حالياً.")
                                     .foregroundColor(.gray)
                                     .padding(.top, 40)
                             } else {
-                                VStack(alignment: .leading, spacing: 15) {
-                                    HStack {
-                                        Text("أحدث الإضافات")
-                                            .font(.system(size: 20, weight: .bold))
-                                            .foregroundColor(.white)
-                                        Spacer()
-                                        
-                                        NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
-                                            Text("اكتشف المزيد ➔")
-                                                .font(.system(size: 14, weight: .bold))
-                                                .foregroundColor(.purple)
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
+                                VStack(alignment: .leading, spacing: 25) {
                                     
-                                    ScrollViewReader { proxy in
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 16) {
-                                                ForEach(Array(top20Apps.enumerated()), id: \.offset) { index, route in
-                                                    NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) {
-                                                        GlassAppCard(app: route.app)
-                                                    }
-                                                    .buttonStyle(.plain)
-                                                    .id(index)
-                                                }
+                                    // ---- السطر الأول (من اليمين لليسار) ----
+                                    VStack(alignment: .leading, spacing: 15) {
+                                        HStack {
+                                            Text("أحدث الإضافات")
+                                                .font(.system(size: 20, weight: .bold))
+                                                .foregroundColor(.white)
+                                            Spacer()
+                                            
+                                            NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
+                                                Text("اكتشف المزيد ➔")
+                                                    .font(.system(size: 14, weight: .bold))
+                                                    .foregroundColor(.purple)
+                                            }
+                                        }
+                                        .padding(.horizontal, 20)
+                                        
+                                        ContinuousMarquee(apps: top10Apps, moveLeft: true)
+                                    }
+                                    
+                                    // ---- السطر الثاني (من اليسار لليمين) ----
+                                    if !bottom10Apps.isEmpty {
+                                        VStack(alignment: .leading, spacing: 15) {
+                                            HStack {
+                                                Text("آخر التحديثات")
+                                                    .font(.system(size: 20, weight: .bold))
+                                                    .foregroundColor(.white)
+                                                Spacer()
                                             }
                                             .padding(.horizontal, 20)
-                                            .padding(.bottom, 10)
-                                        }
-                                        .onReceive(timer) { _ in
-                                            if !top20Apps.isEmpty {
-                                                withAnimation(.easeInOut(duration: 0.6)) {
-                                                    currentIndex = (currentIndex + 1) % top20Apps.count
-                                                    proxy.scrollTo(currentIndex, anchor: .center)
-                                                }
-                                            }
+                                            
+                                            ContinuousMarquee(apps: bottom10Apps, moveLeft: false)
                                         }
                                     }
                                 }
@@ -146,11 +145,9 @@ struct HomeView: View {
             .onAppear {
                 if !hasLoadedOnce {
                     Task {
-                        // تشغيل جلب التطبيقات
                         await viewModel.fetchSources(_allSources, refresh: false)
                         await fetchBannersJSON()
                         
-                        // 🚀 الحل القاضي: إجبار الواجهة على التحديث بعد انتهاء الجلب
                         await MainActor.run {
                             self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                             self.isAppsLoading = false
@@ -159,7 +156,6 @@ struct HomeView: View {
                     }
                 }
             }
-            // مراقب إضافي في حال تأخرت البيانات
             .onChange(of: viewModel.isFinished) { finished in
                 if finished {
                     self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
@@ -187,7 +183,51 @@ struct HomeView: View {
     }
 }
 
-// MARK: - إنترو Xsing (تم حل مشكلة اليمين واليسار)
+// MARK: - 🚀 محرك الحركة المستمرة (Marquee Effect)
+struct ContinuousMarquee: View {
+    let apps: [HomeAppRoute]
+    let moveLeft: Bool
+    
+    @State private var animate = false
+    
+    var body: some View {
+        let itemWidth: CGFloat = 146 // عرض الكارت 130 + المسافة 16
+        let totalWidth = itemWidth * CGFloat(apps.count)
+        
+        VStack {
+            HStack(spacing: 16) {
+                // تكرار التطبيقات 6 مرات لخلق وهم الحركة اللانهائية
+                ForEach(0..<6, id: \.self) { _ in
+                    ForEach(apps, id: \.id) { route in
+                        NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) {
+                            GlassAppCard(app: route.app)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            // إجبار المصفوفة على الترتيب من اليسار لليمين لضمان دقة الحركة
+            .environment(\.layoutDirection, .leftToRight)
+            // تحريك المصفوفة بناءً على الاتجاه
+            .offset(x: animate ? (moveLeft ? -totalWidth : 0) : (moveLeft ? 0 : -totalWidth))
+            .onAppear {
+                animate = false
+                // تأخير بسيط جداً لضمان استمرار الحركة بعد الرجوع من أي صفحة
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    // سرعة الحركة: كلما زاد الرقم صارت أبطأ (2.5 ثانية لكل تطبيق)
+                    withAnimation(.linear(duration: Double(apps.count) * 2.5).repeatForever(autoreverses: false)) {
+                        animate = true
+                    }
+                }
+            }
+        }
+        .frame(height: 160)
+        .frame(maxWidth: .infinity, alignment: moveLeft ? .leading : .trailing)
+        .clipped() // إخفاء الأجزاء الزائدة خارج الشاشة
+    }
+}
+
+// MARK: - إنترو Xsing
 struct XsingIntroView: View {
     @Binding var showIntro: Bool
     
@@ -213,25 +253,19 @@ struct XsingIntroView: View {
                     .opacity(singOpacity)
                     .offset(x: singOffset)
             }
-            // 🚀 هذا السطر يجبر النظام يقرأ من اليسار لليمين مهما كانت لغة الجهاز!
             .environment(\.layoutDirection, .leftToRight)
         }
         .onAppear {
-            // 1. رسم وتكبير حرف X أولاً
             withAnimation(.spring(response: 0.5, dampingFraction: 0.6)) {
                 xScale = 1.0
                 xOpacity = 1.0
             }
-            
-            // 2. ظهور كلمة sing بنعومة بعد نصف ثانية
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation(.easeOut(duration: 0.6)) {
                     singOpacity = 1.0
                     singOffset = 0
                 }
             }
-            
-            // 3. إخفاء الإنترو بالكامل
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     showIntro = false
@@ -385,7 +419,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP
+// MARK: - زر VIP النظيف
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
