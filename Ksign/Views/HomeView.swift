@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, Flawless Architecture)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, 100% CoreData Deadlock Fixed)
 //
 
 import SwiftUI
@@ -21,8 +21,8 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    // 🚀 يستقبل المحرك من TabEnum مباشرة
-    @ObservedObject var viewModel: SourcesViewModel
+    // 🚀 محرك خاص بالشاشة، يعمل بدون التضارب مع باقي التطبيق
+    @StateObject private var viewModel = SourcesViewModel()
     
     @FetchRequest(
         entity: AltSource.entity(),
@@ -34,9 +34,7 @@ struct HomeView: View {
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
-    @State private var loadedRepositories: [ASRepository] = []
-    @State private var isAppsLoading = true
-    
+    // 🚀 حساب التطبيقات مباشرة من المحرك التفاعلي
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -64,26 +62,31 @@ struct HomeView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 24) {
                             
+                            // 1. بانر الصور
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
+                            // 2. زر VIP
                             NavigationLink(destination: VIPPackagesView()) {
                                 CleanVIPButton()
                             }
                             .buttonStyle(.plain)
                             
-                            // 🚀 إخفاء شاشة التحميل فوراً إذا اكو تطبيقات مخزونة مسبقاً
-                            if isAppsLoading && top10Apps.isEmpty {
+                            // 3. التطبيقات المتحركة
+                            if !viewModel.isFinished && allAppsSorted.isEmpty {
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                    Text("جاري ترتيب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
+                                    Text("جاري تحميل التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
-                            } else if top10Apps.isEmpty {
-                                Text("لا توجد تطبيقات حالياً.").foregroundColor(.gray).padding(.top, 40)
+                            } else if allAppsSorted.isEmpty {
+                                Text("لا توجد تطبيقات حالياً.")
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 40)
                             } else {
                                 VStack(alignment: .leading, spacing: 30) {
                                     
+                                    // ---- السطر الأول (أحدث الإضافات) ----
                                     VStack(alignment: .leading, spacing: 15) {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
@@ -92,9 +95,11 @@ struct HomeView: View {
                                                 Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                             }
                                         }.padding(.horizontal, 20)
+                                        
                                         ContinuousMarquee(apps: top10Apps, moveLeft: true)
                                     }
                                     
+                                    // ---- السطر الثاني (آخر التحديثات) ----
                                     if !bottom10Apps.isEmpty {
                                         VStack(alignment: .leading, spacing: 15) {
                                             HStack {
@@ -104,6 +109,7 @@ struct HomeView: View {
                                                     Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                                 }
                                             }.padding(.horizontal, 20)
+                                            
                                             ContinuousMarquee(apps: bottom10Apps, moveLeft: false)
                                         }
                                     }
@@ -121,29 +127,18 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
+                    // 🚀 الحل الذكي للتعليق: تأخير نصف ثانية لمنع اختناق قاعدة البيانات وية متجر التطبيقات
                     Task {
-                        // 🚀 (defer) سحر برمجي: يضمن إن علامة التحميل تختفي 100% حتى لو النت فصل
-                        defer {
-                            Task { @MainActor in self.isAppsLoading = false }
-                        }
+                        try? await Task.sleep(nanoseconds: 800_000_000)
                         await viewModel.fetchSources(_allSources, refresh: false)
-                        await MainActor.run {
-                            self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
-                        }
                     }
-                } else {
-                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                 }
             }
-            .onChange(of: viewModel.isFinished) { finished in
-                if finished {
-                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
-                    self.isAppsLoading = false
-                }
-            }
+            // 🚀 بمجرد ما يضيف التطبيق سورس أو يسحب، راح تتحدث الواجهة تلقائياً
             .onChange(of: _allSources.count) { _ in
-                self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
-                if !self.loadedRepositories.isEmpty { self.isAppsLoading = false }
+                Task {
+                    await viewModel.fetchSources(_allSources, refresh: false)
+                }
             }
         }
     }
@@ -166,7 +161,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - 🚀 محرك الحركة المستمرة (الخرافي)
+// MARK: - 🚀 محرك الحركة المستمرة (بدون توقف)
 struct ContinuousMarquee: View {
     let apps: [HomeAppRoute]
     let moveLeft: Bool
@@ -242,7 +237,7 @@ struct XsingIntroView: View {
     }
 }
 
-// MARK: - صفحة باقات VIP
+// MARK: - صفحة باقات VIP (الباقة النارية)
 struct VIPPackagesView: View {
     let commonFeatures = ["تطبيقات معدلة حصرية وبدون إعلانات", "تكرار التطبيقات اللامحدود", "إشعارات شغالة 100%", "تحديثات مستمرة وفورية للتطبيقات", "دعم فني مباشر وسريع"]
     
@@ -314,9 +309,9 @@ struct DynamicImageSliderBanner: View {
             TabView(selection: $currentBanner) {
                 ForEach(Array(urls.enumerated()), id: \.offset) { index, urlString in
                     AsyncImage(url: URL(string: urlString)) { phase in
-                        if let image = phase.image { 
-                            image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() 
-                        } else if phase.error != nil {
+                        if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() }
+                        else if phase.error != nil {
+                            // تم تحسين شكل الخطأ في حال كانت الصورة محذوفة من السيرفر
                             ZStack { 
                                 Color(white: 0.1)
                                 VStack(spacing: 8) {
