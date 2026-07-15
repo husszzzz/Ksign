@@ -95,7 +95,7 @@ extension Storage {
 	func addBuiltInSources() {
 		let builtInSourceURLs = [
             
-            "https://fastsign.dev/repo.json"
+            "https://repository.apptesters.org"
 		]
 		
 		for urlString in builtInSourceURLs {
