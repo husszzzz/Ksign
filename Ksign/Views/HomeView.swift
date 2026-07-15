@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, Perfect Infinite Marquee)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, Perfect Infinite Marquee, Build Fixed)
 //
 
 import SwiftUI
@@ -21,7 +21,8 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    @ObservedObject var viewModel: SourcesViewModel
+    // 🚀 تم إرجاع StateObject لحل مشكلة البناء (Build Error) وعدم الاعتماد على TabEnum
+    @StateObject private var viewModel = SourcesViewModel()
     
     @FetchRequest(
         entity: AltSource.entity(),
@@ -67,7 +68,7 @@ struct HomeView: View {
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
-                            // 2. زر VIP (بدون حدود خايسة)
+                            // 2. زر VIP (بدون حدود)
                             NavigationLink(destination: VIPPackagesView()) {
                                 CleanVIPButton()
                             }
@@ -104,7 +105,6 @@ struct HomeView: View {
                                             HStack {
                                                 Text("آخر التحديثات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                                 Spacer()
-                                                // 🚀 إضافة اكتشف المزيد للسطر الثاني
                                                 NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
                                                     Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                                 }
@@ -172,7 +172,7 @@ struct ContinuousMarquee: View {
     @State private var offset: CGFloat = 0
     @State private var isPaused: Bool = false
     
-    // المؤقت المسؤول عن نعومة الحركة (يعادل 60 فريم)
+    // المؤقت المسؤول عن نعومة الحركة
     let timer = Timer.publish(every: 0.015, on: .main, in: .common).autoconnect()
     
     var body: some View {
@@ -195,13 +195,13 @@ struct ContinuousMarquee: View {
             .environment(\.layoutDirection, .leftToRight)
             .offset(x: offset)
             .onReceive(timer) { _ in
-                // 🚀 إذا داس المستخدم، يوكف الحركة. وإذا شال إيده، ترجع!
+                // 🚀 توقف الحركة عند اللمس
                 guard !isPaused, totalWidth > 0 else { return }
                 
                 if moveLeft {
-                    offset -= 1.0 // سرعة الحركة
+                    offset -= 1.0
                     if offset <= -totalWidth {
-                        offset += totalWidth // إعادة الشريط بنعومة بدون ما يحس المستخدم
+                        offset += totalWidth
                     }
                 } else {
                     offset += 1.0
@@ -220,7 +220,6 @@ struct ContinuousMarquee: View {
         .frame(height: 160)
         .clipped()
         .onAppear {
-            // تهيئة اتجاه البداية للسطر الثاني
             if !moveLeft {
                 offset = -totalWidth
             }
@@ -334,7 +333,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP النظيف (تم إزالة الحدود الخايسة)
+// MARK: - زر VIP النظيف (تم إزالة الحدود)
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
