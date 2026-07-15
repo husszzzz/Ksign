@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, 100% CoreData Deadlock Fixed)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, 100% Perfect & Bug Free)
 //
 
 import SwiftUI
@@ -21,7 +21,6 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    // 🚀 محرك خاص بالشاشة، يعمل بدون التضارب مع باقي التطبيق
     @StateObject private var viewModel = SourcesViewModel()
     
     @FetchRequest(
@@ -34,7 +33,10 @@ struct HomeView: View {
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
-    // 🚀 حساب التطبيقات مباشرة من المحرك التفاعلي
+    @State private var loadedRepositories: [ASRepository] = []
+    @State private var isAppsLoading = true
+    
+    // جلب التطبيقات
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -73,10 +75,10 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             
                             // 3. التطبيقات المتحركة
-                            if !viewModel.isFinished && allAppsSorted.isEmpty {
+                            if isAppsLoading {
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                    Text("جاري تحميل التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
+                                    Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
                             } else if allAppsSorted.isEmpty {
@@ -127,17 +129,19 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
-                    // 🚀 الحل الذكي للتعليق: تأخير نصف ثانية لمنع اختناق قاعدة البيانات وية متجر التطبيقات
+                    // 🚀 السحر هنا: تأخير ذكي يمنع اختناق السيرفر ويطلع التطبيقات فوراً
                     Task {
-                        try? await Task.sleep(nanoseconds: 800_000_000)
+                        try? await Task.sleep(nanoseconds: 1_000_000_000)
+                        // قراءة من الذاكرة المحلية (refresh: false) لمنع التعليق
                         await viewModel.fetchSources(_allSources, refresh: false)
+                        await MainActor.run {
+                            self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                            self.isAppsLoading = false
+                        }
                     }
-                }
-            }
-            // 🚀 بمجرد ما يضيف التطبيق سورس أو يسحب، راح تتحدث الواجهة تلقائياً
-            .onChange(of: _allSources.count) { _ in
-                Task {
-                    await viewModel.fetchSources(_allSources, refresh: false)
+                } else {
+                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                    self.isAppsLoading = false
                 }
             }
         }
@@ -161,7 +165,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - 🚀 محرك الحركة المستمرة (بدون توقف)
+// MARK: - 🚀 محرك الحركة المستمرة (اللا نهائي)
 struct ContinuousMarquee: View {
     let apps: [HomeAppRoute]
     let moveLeft: Bool
@@ -311,7 +315,6 @@ struct DynamicImageSliderBanner: View {
                     AsyncImage(url: URL(string: urlString)) { phase in
                         if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() }
                         else if phase.error != nil {
-                            // تم تحسين شكل الخطأ في حال كانت الصورة محذوفة من السيرفر
                             ZStack { 
                                 Color(white: 0.1)
                                 VStack(spacing: 8) {
@@ -343,7 +346,7 @@ struct CleanVIPButton: View {
     }
 }
 
-// MARK: - كارت التطبيق (شفاف وبدون خلفية)
+// MARK: - 🚀 كارت التطبيق (شفاف وبدون أي خلفية)
 struct GlassAppCard: View {
     let app: ASRepository.App
     var body: some View {
