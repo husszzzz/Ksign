@@ -1,13 +1,13 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, 100% Reactive & Bug Free)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, Flawless Architecture)
 //
 
 import SwiftUI
 import AltSourceKit
 import CoreData
 
-// MARK: - هيكل البيانا لملف البانرات JSON
+// MARK: - هيكل البيانات لملف البانرات JSON
 struct BannersConfig: Codable {
     let banners: [String]?
 }
@@ -21,7 +21,8 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    @StateObject private var viewModel = SourcesViewModel()
+    // 🚀 يستقبل المحرك من TabEnum مباشرة
+    @ObservedObject var viewModel: SourcesViewModel
     
     @FetchRequest(
         entity: AltSource.entity(),
@@ -33,13 +34,15 @@ struct HomeView: View {
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
-    // 🚀 الحل السحري والنهائي: حساب التطبيقات مباشرة من المحرك بدون أي تأخير أو ذاكرة وسيطة!
+    @State private var loadedRepositories: [ASRepository] = []
+    @State private var isAppsLoading = true
+    
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
             if let repo = viewModel.sources[source] {
                 for app in repo.apps {
-                    all.append(HomeAppRoute(source: source, app: app))
+                    all.append(HomeAppRoute(source: repo, app: app))
                 }
             }
         }
@@ -49,11 +52,6 @@ struct HomeView: View {
     private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(10)) }
     private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 10 ? Array(allAppsSorted.dropFirst(10).prefix(10)) : [] }
     private var top50Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(50)) }
-    
-    // 🚀 حالة التحميل الذكية (تعتمد على المحرك مباشرة)
-    private var isLoading: Bool {
-        return !viewModel.isFinished && allAppsSorted.isEmpty
-    }
     
     var body: some View {
         NavigationStack {
@@ -66,31 +64,26 @@ struct HomeView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 24) {
                             
-                            // 1. بانر الصور (مع حل مشكلة التحميل اللانهائي)
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
-                            // 2. زر VIP
                             NavigationLink(destination: VIPPackagesView()) {
                                 CleanVIPButton()
                             }
                             .buttonStyle(.plain)
                             
-                            // 3. التطبيقات المتحركة
-                            if isLoading {
+                            // 🚀 إخفاء شاشة التحميل فوراً إذا اكو تطبيقات مخزونة مسبقاً
+                            if isAppsLoading && top10Apps.isEmpty {
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                    Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
+                                    Text("جاري ترتيب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
-                            } else if allAppsSorted.isEmpty {
-                                Text("لا توجد تطبيقات حالياً.")
-                                    .foregroundColor(.gray)
-                                    .padding(.top, 40)
+                            } else if top10Apps.isEmpty {
+                                Text("لا توجد تطبيقات حالياً.").foregroundColor(.gray).padding(.top, 40)
                             } else {
                                 VStack(alignment: .leading, spacing: 30) {
                                     
-                                    // ---- السطر الأول (أحدث الإضافات) ----
                                     VStack(alignment: .leading, spacing: 15) {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
@@ -99,11 +92,9 @@ struct HomeView: View {
                                                 Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                             }
                                         }.padding(.horizontal, 20)
-                                        
                                         ContinuousMarquee(apps: top10Apps, moveLeft: true)
                                     }
                                     
-                                    // ---- السطر الثاني (آخر التحديثات) ----
                                     if !bottom10Apps.isEmpty {
                                         VStack(alignment: .leading, spacing: 15) {
                                             HStack {
@@ -113,7 +104,6 @@ struct HomeView: View {
                                                     Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                                 }
                                             }.padding(.horizontal, 20)
-                                            
                                             ContinuousMarquee(apps: bottom10Apps, moveLeft: false)
                                         }
                                     }
@@ -131,11 +121,29 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
-                    // 🚀 أمر جلب مباشر بدون أي تأخيرات وهمية
                     Task {
+                        // 🚀 (defer) سحر برمجي: يضمن إن علامة التحميل تختفي 100% حتى لو النت فصل
+                        defer {
+                            Task { @MainActor in self.isAppsLoading = false }
+                        }
                         await viewModel.fetchSources(_allSources, refresh: false)
+                        await MainActor.run {
+                            self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                        }
                     }
+                } else {
+                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                 }
+            }
+            .onChange(of: viewModel.isFinished) { finished in
+                if finished {
+                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                    self.isAppsLoading = false
+                }
+            }
+            .onChange(of: _allSources.count) { _ in
+                self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
+                if !self.loadedRepositories.isEmpty { self.isAppsLoading = false }
             }
         }
     }
@@ -190,14 +198,10 @@ struct ContinuousMarquee: View {
                 
                 if moveLeft {
                     offset -= 1.0
-                    if offset <= -totalWidth {
-                        offset += totalWidth
-                    }
+                    if offset <= -totalWidth { offset += totalWidth }
                 } else {
                     offset += 1.0
-                    if offset >= 0 {
-                        offset -= totalWidth
-                    }
+                    if offset >= 0 { offset -= totalWidth }
                 }
             }
             .simultaneousGesture(
@@ -209,9 +213,7 @@ struct ContinuousMarquee: View {
         .frame(height: 160)
         .clipped()
         .onAppear {
-            if !moveLeft {
-                offset = -totalWidth
-            }
+            if !moveLeft { offset = -totalWidth }
         }
     }
 }
@@ -240,7 +242,7 @@ struct XsingIntroView: View {
     }
 }
 
-// MARK: - صفحة باقات VIP (الباقة النارية)
+// MARK: - صفحة باقات VIP
 struct VIPPackagesView: View {
     let commonFeatures = ["تطبيقات معدلة حصرية وبدون إعلانات", "تكرار التطبيقات اللامحدود", "إشعارات شغالة 100%", "تحديثات مستمرة وفورية للتطبيقات", "دعم فني مباشر وسريع"]
     
@@ -299,7 +301,7 @@ struct Top50AppsView: View {
     }
 }
 
-// MARK: - بانر الصور الديناميكي (معدل ومحمي من التحميل اللانهائي)
+// MARK: - بانر الصور الديناميكي
 struct DynamicImageSliderBanner: View {
     let urls: [String]
     @State private var currentBanner = 0
@@ -315,7 +317,6 @@ struct DynamicImageSliderBanner: View {
                         if let image = phase.image { 
                             image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() 
                         } else if phase.error != nil {
-                            // 🚀 حل مشكلة الدوران اللانهائي إذا كانت الصورة محذوفة
                             ZStack { 
                                 Color(white: 0.1)
                                 VStack(spacing: 8) {
@@ -347,7 +348,7 @@ struct CleanVIPButton: View {
     }
 }
 
-// MARK: - كارت التطبيق (بدون خلفية)
+// MARK: - كارت التطبيق (شفاف وبدون خلفية)
 struct GlassAppCard: View {
     let app: ASRepository.App
     var body: some View {
