@@ -1,103 +1,106 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite UI)
-//
-//  Created for Hassany Store.
-//  Features: Intro, 3D Banner, Auto-scrolling Top 5 Recent Apps, Self-contained ViewModel.
+//  Feather (Modified for Hassany Store - Elite Xsing UI)
 //
 
 import SwiftUI
 import AltSourceKit
 import CoreData
 
-// MARK: - مسار التطبيق (للانتقال للتفاصيل)
+// MARK: - هيكل البيانات لملف البانرات JSON
+struct BannersConfig: Codable {
+    let banners: [String]?
+}
+
+// MARK: - مسار التطبيق
 struct HomeAppRoute: Identifiable, Hashable {
     let source: ASRepository
     let app: ASRepository.App
     let id: String = UUID().uuidString
 }
 
-// MARK: - الواجهة الرئيسية الفخمة
+// MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    // 🚀 الحل الجذري للإيرور: الشاشة تنشئ المحرك بنفسها دون الحاجة لملف TabEnum
     @StateObject private var viewModel = SourcesViewModel()
     
-    // سحب السورسات من قاعدة البيانات
     @FetchRequest(
         entity: AltSource.entity(),
         sortDescriptors: [NSSortDescriptor(keyPath: \AltSource.name, ascending: true)],
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    @State private var _sources: [ASRepository]?
-    
-    // حالة الإنترو والسكرول
     @State private var showIntro = true
     @State private var currentIndex = 0
+    @State private var hasLoadedOnce = false
+    @State private var bannerURLs: [String] = []
+    
     let timer = Timer.publish(every: 3.0, on: .main, in: .common).autoconnect()
     
-    // 🚀 جلب أحدث 5 تطبيقات فقط
-    private var top5Apps: [HomeAppRoute] {
-        guard let sources = _sources else { return [] }
+    // 🚀 جلب جميع التطبيقات مرتبة من الأحدث للأقدم
+    private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
-        
-        for source in sources {
-            for app in source.apps {
-                all.append(HomeAppRoute(source: source, app: app))
+        for source in _allSources {
+            if let repo = viewModel.sources[source] {
+                for app in repo.apps {
+                    all.append(HomeAppRoute(source: repo, app: app))
+                }
             }
         }
-        
-        // عكس المصفوفة لجلب الأحدث، ثم أخذ أول 5 فقط
-        all = all.reversed()
-        return Array(all.prefix(5))
+        return all.reversed()
+    }
+    
+    // أول 5 تطبيقات للشاشة الرئيسية
+    private var top5Apps: [HomeAppRoute] {
+        return Array(allAppsSorted.prefix(5))
+    }
+    
+    // أول 50 تطبيق لصفحة "اكتشف المزيد"
+    private var top50Apps: [HomeAppRoute] {
+        return Array(allAppsSorted.prefix(50))
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea() // خلفية سوداء عميقة
+                Color.black.ignoresSafeArea()
                 
                 if showIntro {
-                    // 1. الإنترو السينمائي
-                    IntroAnimationView(showIntro: $showIntro)
+                    XsingIntroView(showIntro: $showIntro)
                 } else {
-                    // 2. محتوى الصفحة الرئيسية
                     ScrollView(.vertical, showsIndicators: false) {
-                        VStack(spacing: 25) {
+                        VStack(spacing: 24) {
                             
-                            // الهيدر الترحيبي
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("مرحباً بك، يا بطل ⚡️")
-                                        .font(.system(size: 22, weight: .heavy, design: .rounded))
-                                        .foregroundColor(.white)
-                                    Text("اكتشف أقوى التطبيقات المعدلة")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.gray)
-                                }
-                                Spacer()
-                                Circle()
-                                    .fill(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
-                                    .frame(width: 45, height: 45)
-                                    .overlay(Image(systemName: "person.fill").foregroundColor(.white))
+                            // 1. بانر الصورتين المتحرك (يسحب من JSON)
+                            DynamicImageSliderBanner(urls: bannerURLs)
+                                .padding(.top, 15)
+                            
+                            // 2. زر الترقية إلى VIP
+                            NavigationLink(destination: VIPPackagesView()) {
+                                CleanVIPButton()
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.top, 10)
+                            .buttonStyle(.plain)
                             
-                            // البانر الفخم VIP
-                            PremiumBannerView()
-                            
-                            // شريط أحدث 5 تطبيقات (متحرك تلقائياً ومربوط بالبيانات الحقيقية)
+                            // 3. شريط أحدث 5 تطبيقات
                             if top5Apps.isEmpty {
-                                ProgressView("جاري تحميل التطبيقات...")
-                                    .padding(.top, 30)
+                                VStack {
+                                    ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
+                                    Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
+                                }
+                                .padding(.top, 40)
                             } else {
                                 VStack(alignment: .leading, spacing: 15) {
                                     HStack {
-                                        Text("🔥 أحدث الإضافات")
+                                        Text("أحدث الإضافات")
                                             .font(.system(size: 20, weight: .bold))
                                             .foregroundColor(.white)
                                         Spacer()
+                                        
+                                        // 🚀 زر اكتشف المزيد (ينقل لصفحة الـ 50 تطبيق)
+                                        NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
+                                            Text("اكتشف المزيد ➔")
+                                                .font(.system(size: 14, weight: .bold))
+                                                .foregroundColor(.purple)
+                                        }
                                     }
                                     .padding(.horizontal, 20)
                                     
@@ -134,45 +137,90 @@ struct HomeView: View {
                 }
             }
             .onAppear {
-                _loadData()
-            }
-            .onChange(of: viewModel.isFinished) { _ in
-                _loadData()
+                if !hasLoadedOnce {
+                    Task {
+                        await viewModel.fetchSources(_allSources, refresh: false)
+                        await fetchBannersJSON()
+                        hasLoadedOnce = true
+                    }
+                }
             }
         }
     }
     
-    // دالة جلب البيانات الخاصة بالمتجر
-    private func _loadData() {
-        Task {
-            // تحميل السورسات من الفيو مودل
-            let loadedSources = _allSources.compactMap { viewModel.sources[$0] }
-            _sources = loadedSources
+    // MARK: - دالة سحب البانرات من ملف JSON
+    private func fetchBannersJSON() async {
+        // ضع رابط الـ RAW لملف banners.json الخاص بك هنا.
+        // استخدمت روابطك بالصورة كقيمة افتراضية حتى لا تعطل الشاشة أبداً.
+        let defaultBanners = [
+            "https://a.top4top.io/p_3837rcc760.png",
+            "https://k.top4top.io/p_383717crg1.png"
+        ]
+        
+        guard let url = URL(string: "https://raw.githubusercontent.com/Nyasami/Ksign/main/banners.json") else {
+            self.bannerURLs = defaultBanners
+            return
+        }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let config = try JSONDecoder().decode(BannersConfig.self, from: data)
+            if let fetchedBanners = config.banners, !fetchedBanners.isEmpty {
+                self.bannerURLs = fetchedBanners
+            } else {
+                self.bannerURLs = defaultBanners
+            }
+        } catch {
+            print("❌ فشل جلب البانرات: \(error)")
+            self.bannerURLs = defaultBanners
         }
     }
 }
 
-// MARK: - 1. الإنترو السينمائي
-struct IntroAnimationView: View {
-    @Binding var showIntro: Bool
-    @State private var logoScale: CGFloat = 0.5
-    @State private var logoOpacity: Double = 0.0
+// MARK: - صفحة أحدث 50 تطبيق (Top 50 Apps)
+struct Top50AppsView: View {
+    let apps: [HomeAppRoute]
     
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            VStack {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 80))
-                    .foregroundStyle(LinearGradient(colors: [.purple, .blue], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .scaleEffect(logoScale)
-                    .opacity(logoOpacity)
+            
+            ScrollView {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                    ForEach(apps, id: \.id) { route in
+                        NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) {
+                            GlassAppCard(app: route.app)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(16)
             }
         }
+        .navigationTitle("أحدث التطبيقات")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - إنترو Xsing
+struct XsingIntroView: View {
+    @Binding var showIntro: Bool
+    @State private var textScale: CGFloat = 0.8
+    @State private var textOpacity: Double = 0.0
+    
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            Text("Xsing")
+                .font(.system(size: 65, weight: .black, design: .rounded))
+                .foregroundStyle(LinearGradient(colors: [.white, .gray], startPoint: .top, endPoint: .bottom))
+                .scaleEffect(textScale)
+                .opacity(textOpacity)
+        }
         .onAppear {
-            withAnimation(.spring(response: 1.0, dampingFraction: 0.6)) {
-                logoScale = 1.2
-                logoOpacity = 1.0
+            withAnimation(.spring(response: 1.2, dampingFraction: 0.7)) {
+                textScale = 1.0
+                textOpacity = 1.0
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 withAnimation(.easeInOut(duration: 0.5)) {
@@ -183,87 +231,116 @@ struct IntroAnimationView: View {
     }
 }
 
-// MARK: - 2. البانر الفخم (Premium Banner 3D)
-struct PremiumBannerView: View {
-    @State private var pulse = false
-    @State private var gradientShift = false
+// MARK: - بانر الصور الديناميكي (يسحب الروابط من الإنترنت)
+struct DynamicImageSliderBanner: View {
+    let urls: [String]
+    @State private var currentBanner = 0
+    let timer = Timer.publish(every: 4.0, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 25)
-                .fill(LinearGradient(colors: [.purple.opacity(0.4), .blue.opacity(0.4)], startPoint: gradientShift ? .topLeading : .bottomTrailing, endPoint: gradientShift ? .bottomTrailing : .topLeading))
-                .frame(height: 160)
-                .blur(radius: 20)
-                .padding(.horizontal, 25)
-            
-            HStack {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("ترقية إلى VIP 👑")
-                        .font(.system(size: 22, weight: .black))
-                        .foregroundStyle(LinearGradient(colors: [.yellow, .orange], startPoint: .leading, endPoint: .trailing))
-                        .shadow(color: .orange.opacity(0.5), radius: 5)
-                    
-                    Text("حمل بدون إعلانات، وتطبيقات معدلة حصرية فقط للمشتركين.")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.white.opacity(0.8))
-                        .lineLimit(3)
-                    
-                    Spacer()
-                    
-                    Text("اشترك الآن ➔")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.2))
-                        .clipShape(Capsule())
+        if urls.isEmpty {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(Color(white: 0.1))
+                .frame(height: 180)
+                .padding(.horizontal, 20)
+        } else {
+            TabView(selection: $currentBanner) {
+                ForEach(Array(urls.enumerated()), id: \.offset) { index, urlString in
+                    AsyncImage(url: URL(string: urlString)) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            ZStack {
+                                Color(white: 0.1)
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .tag(index)
                 }
-                .padding(20)
-                Spacer()
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom))
-                    .shadow(color: .orange.opacity(0.8), radius: pulse ? 15 : 5)
-                    .scaleEffect(pulse ? 1.1 : 1.0)
-                    .padding(.trailing, 20)
             }
-            .frame(height: 160)
-            .background(RoundedRectangle(cornerRadius: 25).fill(Color(white: 0.08).opacity(0.9)))
-            .overlay(RoundedRectangle(cornerRadius: 25).stroke(LinearGradient(colors: [.orange.opacity(0.6), .purple.opacity(0.3), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1.5))
+            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
+            .frame(height: 180)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .padding(.horizontal, 20)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) { pulse = true }
-            withAnimation(.linear(duration: 3.0).repeatForever(autoreverses: true)) { gradientShift = true }
+            .onReceive(timer) { _ in
+                withAnimation {
+                    currentBanner = (currentBanner + 1) % urls.count
+                }
+            }
         }
     }
 }
 
-// MARK: - تصميم كارت التطبيق الحقيقي (يسحب الأيقونة والاسم من السورس)
+// MARK: - زر VIP النظيف
+struct CleanVIPButton: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            Image(systemName: "crown.fill")
+                .font(.system(size: 26))
+                .foregroundStyle(LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom))
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("الترقية إلى VIP")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+                Text("اكتشف الباقات والمميزات الحصرية")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(.gray)
+            }
+            Spacer()
+            Image(systemName: "chevron.left")
+                .foregroundColor(.gray.opacity(0.6))
+        }
+        .padding(20)
+        .background(Color(white: 0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 20)
+    }
+}
+
+// MARK: - صفحة باقات VIP
+struct VIPPackagesView: View {
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.yellow)
+                    .padding(.bottom, 20)
+                Text("باقات VIP")
+                    .font(.largeTitle.bold())
+                    .foregroundColor(.white)
+                Text("هنا يمكنك تصميم وعرض الباقات الخاصة بك")
+                    .foregroundColor(.gray)
+                    .padding(.top, 8)
+            }
+        }
+        .navigationTitle("الاشتراكات")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - كارت التطبيق
 struct GlassAppCard: View {
     let app: ASRepository.App
     
     var body: some View {
         VStack(spacing: 12) {
-            // سحب الأيقونة الحقيقية من الرابط
             AsyncImage(url: app.iconURL) { phase in
                 if let image = phase.image {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    image.resizable().aspectRatio(contentMode: .fill)
                 } else if phase.error != nil {
-                    Image(systemName: "app.dashed")
-                        .resizable()
-                        .foregroundColor(.gray)
+                    Image(systemName: "app.dashed").resizable().foregroundColor(.gray)
                 } else {
                     ProgressView()
                 }
             }
             .frame(width: 65, height: 65)
             .clipShape(RoundedRectangle(cornerRadius: 18))
-            .shadow(color: .purple.opacity(0.2), radius: 5)
             
-            // سحب الاسم والإصدار الحقيقي
             VStack(spacing: 4) {
                 Text(app.name ?? "تطبيق")
                     .font(.system(size: 14, weight: .bold))
@@ -280,20 +357,17 @@ struct GlassAppCard: View {
                 }
             }
             
-            // زر التنزيل
             Text("تنزيل")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(.white)
                 .frame(width: 80, height: 28)
-                .background(Color.white.opacity(0.1))
+                .background(Color.white.opacity(0.15))
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 1))
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 12)
         .frame(width: 130)
-        .background(Color(white: 0.05))
+        .background(Color(white: 0.06))
         .clipShape(RoundedRectangle(cornerRadius: 24))
-        .overlay(RoundedRectangle(cornerRadius: 24).stroke(Color.white.opacity(0.08), lineWidth: 1))
     }
 }
