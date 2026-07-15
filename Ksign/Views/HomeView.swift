@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, Perfect Infinite Marquee, Build Fixed)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, No Background Cards)
 //
 
 import SwiftUI
@@ -21,7 +21,6 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية
 struct HomeView: View {
-    // 🚀 تم إرجاع StateObject لحل مشكلة البناء (Build Error) وعدم الاعتماد على TabEnum
     @StateObject private var viewModel = SourcesViewModel()
     
     @FetchRequest(
@@ -68,7 +67,7 @@ struct HomeView: View {
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
-                            // 2. زر VIP (بدون حدود)
+                            // 2. زر VIP
                             NavigationLink(destination: VIPPackagesView()) {
                                 CleanVIPButton()
                             }
@@ -172,14 +171,12 @@ struct ContinuousMarquee: View {
     @State private var offset: CGFloat = 0
     @State private var isPaused: Bool = false
     
-    // المؤقت المسؤول عن نعومة الحركة
     let timer = Timer.publish(every: 0.015, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        let itemWidth: CGFloat = 146 // 130 عرض + 16 مسافة
+        // 🚀 القياسات الجديدة بعد مسح المربع الرصاصي (110 العرض + 16 مسافة)
+        let itemWidth: CGFloat = 126 
         let totalWidth = itemWidth * CGFloat(apps.count)
-        
-        // تكرار التطبيقات 3 مرات لضمان عدم ظهور أي فراغ أو انقطاع
         let extendedApps = apps + apps + apps
         
         GeometryReader { proxy in
@@ -195,7 +192,6 @@ struct ContinuousMarquee: View {
             .environment(\.layoutDirection, .leftToRight)
             .offset(x: offset)
             .onReceive(timer) { _ in
-                // 🚀 توقف الحركة عند اللمس
                 guard !isPaused, totalWidth > 0 else { return }
                 
                 if moveLeft {
@@ -210,7 +206,6 @@ struct ContinuousMarquee: View {
                     }
                 }
             }
-            // 🚀 أمر التوقف عند اللمس (يسمح بفتح التطبيق بنفس الوقت)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in isPaused = true }
@@ -300,7 +295,8 @@ struct Top50AppsView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                // 🚀 صغرت القياس هنا حتى يترتب بعد إزالة المربع الرصاصي
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 16)], spacing: 20) {
                     ForEach(apps, id: \.id) { route in
                         NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) { GlassAppCard(app: route.app) }.buttonStyle(.plain)
                     }
@@ -333,7 +329,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP النظيف (تم إزالة الحدود)
+// MARK: - زر VIP النظيف
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
@@ -346,16 +342,16 @@ struct CleanVIPButton: View {
     }
 }
 
-// MARK: - كارت التطبيق (نظيف وبدون حدود)
+// MARK: - 🚀 كارت التطبيق (نظيف تماماً، بدون الصندوق الخلفي)
 struct GlassAppCard: View {
     let app: ASRepository.App
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             AsyncImage(url: app.iconURL) { phase in
                 if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill) }
                 else if phase.error != nil { Image(systemName: "app.dashed").resizable().foregroundColor(.gray) }
                 else { ProgressView() }
-            }.frame(width: 65, height: 65).clipShape(RoundedRectangle(cornerRadius: 18))
+            }.frame(width: 75, height: 75).clipShape(RoundedRectangle(cornerRadius: 18))
             
             VStack(spacing: 4) {
                 Text(app.name ?? "تطبيق").font(.system(size: 14, weight: .bold)).foregroundColor(.white).lineLimit(1)
@@ -364,7 +360,11 @@ struct GlassAppCard: View {
                     Text("v\(app.version ?? "1.0")").font(.system(size: 11, weight: .medium)).foregroundColor(.gray)
                 }
             }
-            Text("تنزيل").font(.system(size: 13, weight: .bold)).foregroundColor(.white).frame(width: 80, height: 28).background(Color.white.opacity(0.15)).clipShape(Capsule())
-        }.padding(.vertical, 16).padding(.horizontal, 12).frame(width: 130).background(Color(white: 0.1)).clipShape(RoundedRectangle(cornerRadius: 24))
+            Text("تنزيل").font(.system(size: 13, weight: .bold)).foregroundColor(.white).frame(width: 75, height: 26).background(Color.white.opacity(0.15)).clipShape(Capsule())
+        }
+        .padding(.vertical, 8)
+        .frame(width: 110)
+        // 🚀 السحر هنا: خلينا الخلفية شفافة حتى تلغي المربع الرصاصي بالكامل
+        .background(Color.clear) 
     }
 }
