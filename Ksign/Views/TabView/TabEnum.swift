@@ -1,6 +1,12 @@
 import SwiftUI
 import NimbleViews
 import UniformTypeIdentifiers
+import AltSourceKit // 🚀 ضروري حتى يتعرف على SourcesViewModel
+
+// 🚀 هذا هو المحرك المشترك السري: راح يغذي الشاشة الرئيسية بدون ما يضرب باقي الملفات
+struct SharedEngine {
+    static let sourcesViewModel = SourcesViewModel()
+}
 
 enum TabEnum: String, CaseIterable, Hashable {
     case home         
@@ -27,7 +33,7 @@ enum TabEnum: String, CaseIterable, Hashable {
     var icon: String {
         switch self {
         case .home:         return "house.fill"
-        case .library:      return "signature" // تم تغيير الأيقونة إلى القلم والدائرة (نفس طلبك)
+        case .library:      return "signature" 
         case .appstore:     return "square.stack.3d.up.fill"
         case .settings:     return "slider.horizontal.3"
         case .files:        return "folder.fill"
@@ -39,7 +45,8 @@ enum TabEnum: String, CaseIterable, Hashable {
     @ViewBuilder
     static func view(for tab: TabEnum) -> some View {
         switch tab {
-        case .home: HomeView() 
+        // 🚀 هنا مررنا المحرك المشترك للرئيسية حتى ينتهي إيرور البناء (Build Error)
+        case .home: HomeView(viewModel: SharedEngine.sourcesViewModel) 
         case .library: LibraryView() 
         case .appstore: AppstoreView()
         case .settings: SettingsView()
