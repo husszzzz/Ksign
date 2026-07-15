@@ -7,7 +7,7 @@ import SwiftUI
 import AltSourceKit
 import CoreData
 
-// MARK: - هيكل البيانات لملف البانرات JSON
+// MARK: - هيكل البيانا لملف البانرات JSON
 struct BannersConfig: Codable {
     let banners: [String]?
 }
