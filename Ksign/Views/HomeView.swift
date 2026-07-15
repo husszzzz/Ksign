@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI, No Background Cards)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, 100% Reactive & Bug Free)
 //
 
 import SwiftUI
@@ -33,24 +33,27 @@ struct HomeView: View {
     @State private var hasLoadedOnce = false
     @State private var bannerURLs: [String] = []
     
-    @State private var loadedRepositories: [ASRepository] = []
-    @State private var isAppsLoading = true
-    
-    // جلب التطبيقات
+    // 🚀 الحل السحري والنهائي: حساب التطبيقات مباشرة من المحرك بدون أي تأخير أو ذاكرة وسيطة!
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
-        for repo in loadedRepositories {
-            for app in repo.apps {
-                all.append(HomeAppRoute(source: repo, app: app))
+        for source in _allSources {
+            if let repo = viewModel.sources[source] {
+                for app in repo.apps {
+                    all.append(HomeAppRoute(source: source, app: app))
+                }
             }
         }
         return all.reversed()
     }
     
-    // أول 10 فوك، وثاني 10 جوه، وأول 50 لصفحة المزيد
     private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(10)) }
     private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 10 ? Array(allAppsSorted.dropFirst(10).prefix(10)) : [] }
     private var top50Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(50)) }
+    
+    // 🚀 حالة التحميل الذكية (تعتمد على المحرك مباشرة)
+    private var isLoading: Bool {
+        return !viewModel.isFinished && allAppsSorted.isEmpty
+    }
     
     var body: some View {
         NavigationStack {
@@ -63,7 +66,7 @@ struct HomeView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 24) {
                             
-                            // 1. بانر الصور
+                            // 1. بانر الصور (مع حل مشكلة التحميل اللانهائي)
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
@@ -74,14 +77,16 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             
                             // 3. التطبيقات المتحركة
-                            if isAppsLoading {
+                            if isLoading {
                                 VStack {
                                     ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .purple))
-                                    Text("جاري ترتيب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
+                                    Text("جاري سحب التطبيقات...").foregroundColor(.gray).font(.system(size: 14)).padding(.top, 8)
                                 }
                                 .padding(.top, 40)
-                            } else if top10Apps.isEmpty {
-                                Text("لا توجد تطبيقات حالياً.").foregroundColor(.gray).padding(.top, 40)
+                            } else if allAppsSorted.isEmpty {
+                                Text("لا توجد تطبيقات حالياً.")
+                                    .foregroundColor(.gray)
+                                    .padding(.top, 40)
                             } else {
                                 VStack(alignment: .leading, spacing: 30) {
                                     
@@ -126,21 +131,11 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
+                    // 🚀 أمر جلب مباشر بدون أي تأخيرات وهمية
                     Task {
-                        try? await Task.sleep(nanoseconds: 1_500_000_000)
                         await viewModel.fetchSources(_allSources, refresh: false)
-                        await MainActor.run {
-                            self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
-                            self.isAppsLoading = false
-                        }
                     }
-                } else {
-                    self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
                 }
-            }
-            .onChange(of: _allSources.count) { _ in
-                self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
-                if !self.loadedRepositories.isEmpty { self.isAppsLoading = false }
             }
         }
     }
@@ -163,7 +158,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - 🚀 محرك الحركة المستمرة (الخرافي - بدون توقف أو اختفاء)
+// MARK: - 🚀 محرك الحركة المستمرة (الخرافي)
 struct ContinuousMarquee: View {
     let apps: [HomeAppRoute]
     let moveLeft: Bool
@@ -174,8 +169,7 @@ struct ContinuousMarquee: View {
     let timer = Timer.publish(every: 0.015, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        // 🚀 القياسات الجديدة بعد مسح المربع الرصاصي (110 العرض + 16 مسافة)
-        let itemWidth: CGFloat = 126 
+        let itemWidth: CGFloat = 126 // 110 عرض + 16 مسافة
         let totalWidth = itemWidth * CGFloat(apps.count)
         let extendedApps = apps + apps + apps
         
@@ -295,7 +289,6 @@ struct Top50AppsView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             ScrollView {
-                // 🚀 صغرت القياس هنا حتى يترتب بعد إزالة المربع الرصاصي
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 110), spacing: 16)], spacing: 20) {
                     ForEach(apps, id: \.id) { route in
                         NavigationLink(destination: SourceAppsDetailView(source: route.source, app: route.app)) { GlassAppCard(app: route.app) }.buttonStyle(.plain)
@@ -306,7 +299,7 @@ struct Top50AppsView: View {
     }
 }
 
-// MARK: - بانر الصور الديناميكي
+// MARK: - بانر الصور الديناميكي (معدل ومحمي من التحميل اللانهائي)
 struct DynamicImageSliderBanner: View {
     let urls: [String]
     @State private var currentBanner = 0
@@ -319,8 +312,20 @@ struct DynamicImageSliderBanner: View {
             TabView(selection: $currentBanner) {
                 ForEach(Array(urls.enumerated()), id: \.offset) { index, urlString in
                     AsyncImage(url: URL(string: urlString)) { phase in
-                        if let image = phase.image { image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() }
-                        else { ZStack { Color(white: 0.1); ProgressView() } }
+                        if let image = phase.image { 
+                            image.resizable().aspectRatio(contentMode: .fill).frame(height: 180).clipped() 
+                        } else if phase.error != nil {
+                            // 🚀 حل مشكلة الدوران اللانهائي إذا كانت الصورة محذوفة
+                            ZStack { 
+                                Color(white: 0.1)
+                                VStack(spacing: 8) {
+                                    Image(systemName: "photo.badge.exclamationmark").foregroundColor(.gray).font(.system(size: 30))
+                                    Text("الصورة غير متوفرة").foregroundColor(.gray).font(.system(size: 14))
+                                }
+                            }
+                        } else { 
+                            ZStack { Color(white: 0.1); ProgressView() } 
+                        }
                     }.tag(index)
                 }
             }.tabViewStyle(PageTabViewStyle(indexDisplayMode: .always)).frame(height: 180).clipShape(RoundedRectangle(cornerRadius: 20)).padding(.horizontal, 20)
@@ -342,7 +347,7 @@ struct CleanVIPButton: View {
     }
 }
 
-// MARK: - 🚀 كارت التطبيق (نظيف تماماً، بدون الصندوق الخلفي)
+// MARK: - كارت التطبيق (بدون خلفية)
 struct GlassAppCard: View {
     let app: ASRepository.App
     var body: some View {
@@ -364,7 +369,6 @@ struct GlassAppCard: View {
         }
         .padding(.vertical, 8)
         .frame(width: 110)
-        // 🚀 السحر هنا: خلينا الخلفية شفافة حتى تلغي المربع الرصاصي بالكامل
         .background(Color.clear) 
     }
 }
