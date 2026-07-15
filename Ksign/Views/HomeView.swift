@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  Feather (Modified for Hassany Store - Elite Xsing UI & Infinite Marquee)
+//  Feather (Modified for Hassany Store - Elite Xsing UI, Fixed Layout & Infinite Marquee)
 //
 
 import SwiftUI
@@ -47,12 +47,12 @@ struct HomeView: View {
         return all.reversed()
     }
     
-    // 🚀 أول 10 تطبيقات للسطر العلوي (أحدث الإضافات)
+    // أول 10 تطبيقات للسطر العلوي (أحدث الإضافات)
     private var top10Apps: [HomeAppRoute] {
         return Array(allAppsSorted.prefix(10))
     }
     
-    // 🚀 ثاني 10 تطبيقات للسطر السفلي (آخر التحديثات)
+    // ثاني 10 تطبيقات للسطر السفلي (آخر التحديثات)
     private var bottom10Apps: [HomeAppRoute] {
         if allAppsSorted.count > 10 {
             return Array(allAppsSorted.dropFirst(10).prefix(10))
@@ -76,7 +76,7 @@ struct HomeView: View {
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(spacing: 24) {
                             
-                            // 1. بانر الصورتين المتحرك
+                            // 1. بانر الصورتين المتحرك (معدل ومقفل الحجم)
                             DynamicImageSliderBanner(urls: bannerURLs)
                                 .padding(.top, 15)
                             
@@ -138,6 +138,8 @@ struct HomeView: View {
                             
                             Spacer(minLength: 40)
                         }
+                        // 🚀 هذا يمنع الشاشة من التمدد بالعرض!
+                        .frame(maxWidth: UIScreen.main.bounds.width)
                     }
                     .transition(.opacity)
                 }
@@ -183,7 +185,7 @@ struct HomeView: View {
     }
 }
 
-// MARK: - 🚀 محرك الحركة المستمرة (Marquee Effect)
+// MARK: - 🚀 محرك الحركة المستمرة (معدل ومحمي من تمدد الشاشة)
 struct ContinuousMarquee: View {
     let apps: [HomeAppRoute]
     let moveLeft: Bool
@@ -194,7 +196,8 @@ struct ContinuousMarquee: View {
         let itemWidth: CGFloat = 146 // عرض الكارت 130 + المسافة 16
         let totalWidth = itemWidth * CGFloat(apps.count)
         
-        VStack {
+        // 🚀 استخدمت GeometryReader كصندوق حماية حتى الحركة ما تطلع بره الشاشة
+        GeometryReader { proxy in
             HStack(spacing: 16) {
                 // تكرار التطبيقات 6 مرات لخلق وهم الحركة اللانهائية
                 ForEach(0..<6, id: \.self) { _ in
@@ -206,24 +209,20 @@ struct ContinuousMarquee: View {
                     }
                 }
             }
-            // إجبار المصفوفة على الترتيب من اليسار لليمين لضمان دقة الحركة
-            .environment(\.layoutDirection, .leftToRight)
-            // تحريك المصفوفة بناءً على الاتجاه
+            .environment(\.layoutDirection, .leftToRight) // إجبار الاتجاه
             .offset(x: animate ? (moveLeft ? -totalWidth : 0) : (moveLeft ? 0 : -totalWidth))
-            .onAppear {
-                animate = false
-                // تأخير بسيط جداً لضمان استمرار الحركة بعد الرجوع من أي صفحة
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    // سرعة الحركة: كلما زاد الرقم صارت أبطأ (2.5 ثانية لكل تطبيق)
-                    withAnimation(.linear(duration: Double(apps.count) * 2.5).repeatForever(autoreverses: false)) {
-                        animate = true
-                    }
+        }
+        .frame(height: 160) // تحديد الارتفاع الثابت
+        .clipped() // 🚀 هذا الأمر مستحيل يخلي الشريط يخرب الشاشة
+        .onAppear {
+            animate = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // سرعة الحركة
+                withAnimation(.linear(duration: Double(apps.count) * 2.5).repeatForever(autoreverses: false)) {
+                    animate = true
                 }
             }
         }
-        .frame(height: 160)
-        .frame(maxWidth: .infinity, alignment: moveLeft ? .leading : .trailing)
-        .clipped() // إخفاء الأجزاء الزائدة خارج الشاشة
     }
 }
 
@@ -390,7 +389,7 @@ struct Top50AppsView: View {
     }
 }
 
-// MARK: - بانر الصور الديناميكي
+// MARK: - بانر الصور الديناميكي (معدل ومقفل الحجم)
 struct DynamicImageSliderBanner: View {
     let urls: [String]
     @State private var currentBanner = 0
@@ -403,9 +402,18 @@ struct DynamicImageSliderBanner: View {
             TabView(selection: $currentBanner) {
                 ForEach(Array(urls.enumerated()), id: \.offset) { index, urlString in
                     AsyncImage(url: URL(string: urlString)) { phase in
-                        if let image = phase.image { image.resizable().scaledToFill() }
-                        else { ZStack { Color(white: 0.1); ProgressView() } }
-                    }.tag(index)
+                        if let image = phase.image {
+                            // 🚀 تم إضافة القياسات الصارمة هنا
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill) // يملأ الفراغ بدون تمطيط
+                                .frame(height: 180)
+                                .clipped() // يقص الأجزاء الزائدة
+                        } else {
+                            ZStack { Color(white: 0.1); ProgressView() }
+                        }
+                    }
+                    .tag(index)
                 }
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
@@ -419,7 +427,7 @@ struct DynamicImageSliderBanner: View {
     }
 }
 
-// MARK: - زر VIP النظيف
+// MARK: - زر VIP
 struct CleanVIPButton: View {
     var body: some View {
         HStack(spacing: 16) {
