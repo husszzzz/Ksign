@@ -3,7 +3,7 @@
 //  Feather (Modified for Hassany Store - Elite UI)
 //
 //  Created for Hassany Store.
-//  Features: Intro, 3D Banner, Auto-scrolling Top 5 Recent Apps.
+//  Features: Intro, 3D Banner, Auto-scrolling Top 5 Recent Apps, Self-contained ViewModel.
 //
 
 import SwiftUI
@@ -19,7 +19,8 @@ struct HomeAppRoute: Identifiable, Hashable {
 
 // MARK: - الواجهة الرئيسية الفخمة
 struct HomeView: View {
-    @ObservedObject var viewModel: SourcesViewModel
+    // 🚀 الحل الجذري للإيرور: الشاشة تنشئ المحرك بنفسها دون الحاجة لملف TabEnum
+    @StateObject private var viewModel = SourcesViewModel()
     
     // سحب السورسات من قاعدة البيانات
     @FetchRequest(
@@ -144,7 +145,7 @@ struct HomeView: View {
     // دالة جلب البيانات الخاصة بالمتجر
     private func _loadData() {
         Task {
-            // تحميل السورسات من الفيو مودل الأساسي
+            // تحميل السورسات من الفيو مودل
             let loadedSources = _allSources.compactMap { viewModel.sources[$0] }
             _sources = loadedSources
         }
