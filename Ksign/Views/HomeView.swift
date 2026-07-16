@@ -36,7 +36,7 @@ struct HomeView: View {
     @State private var loadedRepositories: [ASRepository] = []
     @State private var isAppsLoading = true
     
-    // 🚀 جلب كل التطبيقات، ترتيبها، وحذف المكرر بشكل آمن تماماً ومتوافق مع مكتبة المشروع
+    // 🚀 التطبيقات المصفوفة من الأحدث إلى الأقدم (بدون تكرار)
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -47,27 +47,30 @@ struct HomeView: View {
             }
         }
         
-        // 1. عكس المصفوفة لعرض الأحدث بالقمة بطريقة متوافقة وآمنة
-        all.reverse()
-        
-        // 2. فلترة ذكية: منع تكرار التطبيقات باستخدام اسم التطبيق لتفادي تعارض أنواع البيانات
+        // 1. إزالة التكرار مع الاحتفاظ بآخر ظهور (الأحدث) لكل اسم
         var uniqueApps: [HomeAppRoute] = []
         var seenNames = Set<String>()
-        
-        for route in all {
+        // المرور من النهاية إلى البداية لضمان أن أول ظهور نلتقطه هو الأحدث
+        for route in all.reversed() {
             if let appName = route.app.name, !seenNames.contains(appName) {
                 seenNames.insert(appName)
                 uniqueApps.append(route)
             }
         }
-        
+        // 2. النتيجة أصبحت الأحدث أولاً ثم الأقدم بدون تكرار
         return uniqueApps
     }
     
-    // تقسيم التطبيقات للواجهات المتحركة بشكل متناسق
+    // تقسيم التطبيقات للواجهات المتحركة
     private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
     private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
-    private var top50Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(50)) }
+    
+    // تقسيمات جديدة 25 تطبيق لكل صفحة "اكتشف المزيد"
+    private var top25Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(25)) }
+    private var second25Apps: [HomeAppRoute] {
+        guard allAppsSorted.count > 25 else { return [] }
+        return Array(allAppsSorted.dropFirst(25).prefix(25))
+    }
     
     var body: some View {
         NavigationStack {
@@ -109,7 +112,7 @@ struct HomeView: View {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                             Spacer()
-                                            NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
+                                            NavigationLink(destination: Top50AppsView(apps: top25Apps)) {
                                                 Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                             }
                                         }.padding(.horizontal, 20)
@@ -123,7 +126,7 @@ struct HomeView: View {
                                             HStack {
                                                 Text("آخر التحديثات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                                 Spacer()
-                                                NavigationLink(destination: Top50AppsView(apps: top50Apps)) {
+                                                NavigationLink(destination: Top50AppsView(apps: second25Apps)) {
                                                     Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                                 }
                                             }.padding(.horizontal, 20)
@@ -297,7 +300,7 @@ struct VIPPackagesView: View {
     }
 }
 
-// MARK: - صفحة أحدث 50 تطبيق
+// MARK: - صفحة أحدث 25 تطبيق (أو 25 التالية)
 struct Top50AppsView: View {
     let apps: [HomeAppRoute]
     var body: some View {
