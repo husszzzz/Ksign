@@ -16,19 +16,6 @@
       "tintColor": "a855f7"
     },
     {
-      "name": "WhatsApp++",
-      "bundleIdentifier": "com.whatsapp.plus",
-      "developerName": "Hassany",
-      "version": "2.19.71",
-      "versionDate": "2026-07-16T12:00:00-07:00",
-      "versionDescription": "تحديث جديد يضم إخفاء الظهور ومنع حذف الرسائل.",
-      "downloadURL": "https://example.com/whatsapp.ipa",
-      "localizedDescription": "أفضل نسخة معدلة من واتساب بمميزات خرافية وحصرية بدون إعلانات.",
-      "iconURL": "https://a.top4top.io/p_example.png",
-      "size": 52428800,
-      "tintColor": "00FF00"
-    },
-    {
       "name": "LumaFusion",
       "bundleIdentifier": "com.luma-touch.lumafusion",
       "developerName": "Luma Touch LLC",
