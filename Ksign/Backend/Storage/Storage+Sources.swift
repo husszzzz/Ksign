@@ -92,19 +92,19 @@ extension Storage {
 	}
 
 
-	func addBuiltInSources() {
-		let builtInSourceURLs = [
-            
+	    func addBuiltInSources() {
+        let builtInSourceURLs = [
+            "https://raw.githubusercontent.com/husszzzz/Ksign/main/apps.json",
             "https://repository.apptesters.org"
-		]
-		
-		for urlString in builtInSourceURLs {
-			FR.handleSource(urlString) { }
-		}
-	}
+        ]
+        
+        for urlString in builtInSourceURLs {
+            FR.handleSource(urlString) { }
+        }
+    }
 
-	func deleteSource(for source: AltSource) {
-		context.delete(source)
+    func deleteSource(for source: AltSource) {
+
 		saveContext()
 	}
 
