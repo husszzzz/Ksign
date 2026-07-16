@@ -3,6 +3,19 @@
   "identifier": "com.hassanystore.source",
   "apps": [
     {
+      "name": "Video start",
+      "bundleIdentifier": "com.video.hassanyIPA.mod",
+      "developerName": "hassanyIPA",
+      "version": "LastV",
+      "versionDate": "2026-07-16T13:21:03.219Z",
+      "versionDescription": "تم حل مشاكل الكراش وفتح بقيه المميزات يرجى عمل ريموڤ قبل التوقيع",
+      "downloadURL": "https://github.com/arinawzad/kurdstore/releases/download/v1.0.0/Videostar.ipa",
+      "localizedDescription": "مفتوح الاشتراك كامل ",
+      "iconURL": "https://raw.githubusercontent.com/ikiraplus/ipastore/main/images/app-1773546788287.png",
+      "size": 419430400,
+      "tintColor": "a855f7"
+    },
+    {
       "name": "WhatsApp++",
       "bundleIdentifier": "com.whatsapp.plus",
       "developerName": "Hassany",
