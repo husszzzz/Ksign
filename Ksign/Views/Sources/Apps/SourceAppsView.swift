@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Clean Grid UI, Safe Reverse Sorting)
+//  Modified for Hassany Store (Categories & Reverse Sorting)
 //
 
 import SwiftUI
@@ -37,6 +37,9 @@ struct SourceAppsView: View {
     @State private var _selectedRoute: SourceAppRoute?
     @State private var isRefreshing = false
     
+    // 🚀 متغير للتحكم بأقسام المتجر
+    @State private var selectedCategory = 0 // 0: جميع التطبيقات, 1: مميزة
+    
     @State var isLoading = true
     @State var hasLoadedOnce = false
     @State private var _searchText = ""
@@ -56,18 +59,29 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // الفلترة والترتيب (الترتيب الآمن: الأحدث يظهر أولاً)
+    // 🚀 الفلترة والتقسيم (جميع التطبيقات أو مميزة) مع الترتيب (الأحدث أولاً)
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
         
         for source in sources {
-            for app in source.apps {
-                all.append(SourceAppRoute(source: source, app: app))
+            // فلتر "تطبيقاتنا المميزة"
+            if selectedCategory == 1 {
+                // يعرض فقط التطبيقات اللي من سورسك الخاص (غيّر الاسم إذا مسمي سورسك بغير اسم باللوحة)
+                if source.name == "Hassany Store Apps" || source.name == "Hassany Store" {
+                    for app in source.apps {
+                        all.append(SourceAppRoute(source: source, app: app))
+                    }
+                }
+            } else {
+                // فلتر "جميع التطبيقات" (يعرض الكل)
+                for app in source.apps {
+                    all.append(SourceAppRoute(source: source, app: app))
+                }
             }
         }
         
-        // 🚀 الترتيب الآمن: نعكس المصفوفة في الذاكرة المؤقتة فقط لعرض الأحدث بالقمة
+        // عكس المصفوفة ليكون الأحدث بالقمة
         all = all.reversed()
         
         let currentSearch = _searchText.lowercased()
@@ -81,7 +95,6 @@ struct SourceAppsView: View {
         let sortOpt = _sortOption
         let asc = _sortAscending
         
-        // الترتيب حسب الاسم (فقط إذا اختار المستخدم الفلتر يدوياً)
         if sortOpt == .name {
             all.sort { a, b in
                 let nameA = a.app.name ?? ""
@@ -99,10 +112,19 @@ struct SourceAppsView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         
-                        // 1. زر التحديث الفخم
+                        // 🚀 1. شريط التنقل (جميع التطبيقات / مميزة)
+                        Picker("التصنيفات", selection: $selectedCategory) {
+                            Text("جميع التطبيقات").tag(0)
+                            Text("تطبيقاتنا المميزة").tag(1)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        
+                        // 2. زر التحديث الفخم
                         _refreshBanner()
                         
-                        // 2. عداد التطبيقات
+                        // 3. عداد التطبيقات
                         HStack {
                             Text("عدد التطبيقات المتاحة: \(_filteredApps.count)")
                                 .font(.system(size: 14, weight: .bold))
@@ -115,19 +137,31 @@ struct SourceAppsView: View {
                         }
                         .padding(.horizontal, 16)
                         
-                        // 3. شبكة التطبيقات
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
-                            ForEach(_filteredApps, id: \.id) { route in
-                                Button(action: {
-                                    self._selectedRoute = route
-                                }) {
-                                    AppCardView(route: route)
-                                }
-                                .buttonStyle(.plain)
+                        // 4. شبكة التطبيقات أو رسالة فارغة
+                        if _filteredApps.isEmpty {
+                            VStack(spacing: 15) {
+                                Image(systemName: "square.stack.3d.up.slash")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.gray.opacity(0.5))
+                                Text(selectedCategory == 1 ? "لا توجد تطبيقات مميزة حالياً" : "لا توجد تطبيقات")
+                                    .foregroundColor(.gray)
+                                    .font(.system(size: 16, weight: .medium))
                             }
+                            .padding(.top, 60)
+                        } else {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 16)], spacing: 16) {
+                                ForEach(_filteredApps, id: \.id) { route in
+                                    Button(action: {
+                                        self._selectedRoute = route
+                                    }) {
+                                        AppCardView(route: route)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 20)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 20)
                     }
                 }
             } else {
@@ -231,7 +265,7 @@ extension SourceAppsView {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.purple.opacity(0.2), lineWidth: 1))
             .padding(.horizontal, 16)
-            .padding(.top, 10)
+            // .padding(.top, 10)  <- تم الحذف لتقريب الزر من التصنيفات
         }
         .buttonStyle(.plain)
     }
