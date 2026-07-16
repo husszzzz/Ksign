@@ -46,7 +46,7 @@ struct HomeView: View {
                 }
             }
         }
-        return all.reversed()
+        return all
     }
     
     private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(10)) }
