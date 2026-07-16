@@ -209,7 +209,7 @@ struct ContinuousMarquee: View {
                     .onEnded { _ in isPaused = false }
             )
         }
-        .frame(height: 160)
+        .frame(height: 190)
         .clipped()
         .onAppear {
             if !moveLeft { offset = -totalWidth }
