@@ -36,7 +36,7 @@ struct HomeView: View {
     @State private var loadedRepositories: [ASRepository] = []
     @State private var isAppsLoading = true
     
-    // جلب التطبيقات
+    // 🚀 جلب كل التطبيقات، ترتيبها حسب التاريخ (الأحدث أولاً)، وحذف المكرر
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -46,11 +46,30 @@ struct HomeView: View {
                 }
             }
         }
-        return all
+        
+        // 1. ترتيب حقيقي من الأحدث للأقدم حسب تاريخ التحديث (versionDate)
+        all.sort { a, b in
+            let dateA = a.app.versionDate ?? "2000-01-01"
+            let dateB = b.app.versionDate ?? "2000-01-01"
+            return dateA > dateB // الأحدث يظهر أولاً
+        }
+        
+        // 2. فلترة ذكية: منع تكرار التطبيقات إذا السورس مضاف مرتين
+        var uniqueApps: [HomeAppRoute] = []
+        var seenBundleIDs = Set<String>()
+        for route in all {
+            if let bundleID = route.app.bundleIdentifier, !seenBundleIDs.contains(bundleID) {
+                seenBundleIDs.insert(bundleID)
+                uniqueApps.append(route)
+            }
+        }
+        
+        return uniqueApps
     }
     
-    private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(10)) }
-    private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 10 ? Array(allAppsSorted.dropFirst(10).prefix(10)) : [] }
+    // 🚀 تقسيم التطبيقات للواجهة (أحدث الإضافات / التحديثات)
+    private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
+    private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
     private var top50Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(50)) }
     
     var body: some View {
@@ -129,10 +148,9 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
-                    // 🚀 السحر هنا: تأخير ذكي يمنع اختناق السيرفر ويطلع التطبيقات فوراً
+                    // تأخير ذكي يمنع اختناق السيرفر
                     Task {
                         try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        // قراءة من الذاكرة المحلية (refresh: false) لمنع التعليق
                         await viewModel.fetchSources(_allSources, refresh: false)
                         await MainActor.run {
                             self.loadedRepositories = _allSources.compactMap { viewModel.sources[$0] }
