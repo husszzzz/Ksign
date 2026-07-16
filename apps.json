@@ -14,19 +14,6 @@
       "iconURL": "https://raw.githubusercontent.com/ikiraplus/ipastore/main/images/app-1773546788287.png",
       "size": 419430400,
       "tintColor": "a855f7"
-    },
-    {
-      "name": "LumaFusion",
-      "bundleIdentifier": "com.luma-touch.lumafusion",
-      "developerName": "Luma Touch LLC",
-      "version": "4.1.1",
-      "versionDate": "2026-07-15T10:00:00-07:00",
-      "versionDescription": "إضافة تأثيرات جديدة ودعم تصدير 4K بشكل أسرع.",
-      "downloadURL": "https://example.com/lumafusion.ipa",
-      "localizedDescription": "تطبيق المونتاج الاحترافي الأول لأجهزة الآيباد والآيفون مفتوح المميزات بالكامل.",
-      "iconURL": "https://b.top4top.io/p_example2.png",
-      "size": 157286400,
-      "tintColor": "FF0000"
     }
   ]
 }
