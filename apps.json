@@ -3,19 +3,6 @@
   "identifier": "com.hassanystore.source",
   "apps": [
     {
-      "name": "محمل",
-      "bundleIdentifier": "ت",
-      "developerName": "https://husszzzz.github.io/coomCraft/",
-      "version": "ت",
-      "versionDate": "2026-07-16T17:08:17.290Z",
-      "versionDescription": "إصدار جديد.",
-      "downloadURL": "https://husszzzz.github.io/coomCraft/",
-      "localizedDescription": "G",
-      "iconURL": "https://husszzzz.github.io/coomCraft/",
-      "size": 23068672,
-      "tintColor": "a855f7"
-    },
-    {
       "name": "Video start",
       "bundleIdentifier": "com.video.hassanyIPA.mod",
       "developerName": "hassanyIPA",
