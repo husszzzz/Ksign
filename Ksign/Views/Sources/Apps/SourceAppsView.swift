@@ -3,7 +3,7 @@
 //  Feather
 //
 //  Created by samara on 1.05.2025.
-//  Modified for Hassany Store (Categories & Reverse Sorting)
+//  Modified for Hassany Store (Custom Filter UI, Correct Sorting)
 //
 
 import SwiftUI
@@ -59,7 +59,7 @@ struct SourceAppsView: View {
         animation: .snappy
     ) private var _allSources: FetchedResults<AltSource>
     
-    // 🚀 الفلترة والتقسيم (جميع التطبيقات أو مميزة) مع الترتيب (الأحدث أولاً)
+    // 🚀 الفلترة والتقسيم
     private var _filteredApps: [SourceAppRoute] {
         guard let sources = _sources else { return [] }
         var all: [SourceAppRoute] = []
@@ -67,8 +67,8 @@ struct SourceAppsView: View {
         for source in sources {
             // فلتر "تطبيقاتنا المميزة"
             if selectedCategory == 1 {
-                // يعرض فقط التطبيقات اللي من سورسك الخاص (غيّر الاسم إذا مسمي سورسك بغير اسم باللوحة)
-                if source.name == "Hassany Store Apps" || source.name == "Hassany Store" {
+                // يعتمد على وجود كلمة Hassany في اسم السورس لتجنب أخطاء المسافات
+                if let sourceName = source.name, sourceName.localizedCaseInsensitiveContains("Hassany") {
                     for app in source.apps {
                         all.append(SourceAppRoute(source: source, app: app))
                     }
@@ -81,8 +81,7 @@ struct SourceAppsView: View {
             }
         }
         
-        // عكس المصفوفة ليكون الأحدث بالقمة
-        all = all.reversed()
+        // ❌ شلنا الـ reversed() حتى يقرا من السورس مباشرة (واللي هو مرتب من الأحدث للأقدم أصلاً)
         
         let currentSearch = _searchText.lowercased()
         if !currentSearch.isEmpty {
@@ -112,12 +111,18 @@ struct SourceAppsView: View {
                 ScrollView {
                     VStack(spacing: 16) {
                         
-                        // 🚀 1. شريط التنقل (جميع التطبيقات / مميزة)
-                        Picker("التصنيفات", selection: $selectedCategory) {
-                            Text("جميع التطبيقات").tag(0)
-                            Text("تطبيقاتنا المميزة").tag(1)
+                        // 🚀 1. شريط التنقل الجديد (تصميم احترافي فخم)
+                        HStack(spacing: 0) {
+                            FilterTabButton(title: "جميع التطبيقات", isSelected: selectedCategory == 0) {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { selectedCategory = 0 }
+                            }
+                            FilterTabButton(title: "تطبيقاتنا المميزة", isSelected: selectedCategory == 1) {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { selectedCategory = 1 }
+                            }
                         }
-                        .pickerStyle(SegmentedPickerStyle())
+                        .padding(4)
+                        .background(Color(white: 0.1))
+                        .clipShape(Capsule())
                         .padding(.horizontal, 16)
                         .padding(.top, 10)
                         
@@ -224,6 +229,26 @@ struct SourceAppsView: View {
     }
 }
 
+// 🚀 زر الفلتر الجديد المخصص (تصميم فخم)
+struct FilterTabButton: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundColor(isSelected ? .white : .gray)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(isSelected ? LinearGradient(colors: [.purple, Color(red: 0.4, green: 0, blue: 0.8)], startPoint: .leading, endPoint: .trailing) : LinearGradient(colors: [.clear, .clear], startPoint: .leading, endPoint: .trailing))
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 extension SourceAppsView {
     @ViewBuilder
     private func _refreshBanner() -> some View {
@@ -265,7 +290,6 @@ extension SourceAppsView {
             .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.purple.opacity(0.2), lineWidth: 1))
             .padding(.horizontal, 16)
-            // .padding(.top, 10)  <- تم الحذف لتقريب الزر من التصنيفات
         }
         .buttonStyle(.plain)
     }
