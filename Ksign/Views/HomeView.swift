@@ -7,7 +7,7 @@ import SwiftUI
 import AltSourceKit
 import CoreData
 
-// MARK: - هيكلالبيانا لملف البانرات JSON
+// MARK: - هيكل البيانات لملف البانرات JSON
 struct BannersConfig: Codable {
     let banners: [String]?
 }
@@ -36,7 +36,7 @@ struct HomeView: View {
     @State private var loadedRepositories: [ASRepository] = []
     @State private var isAppsLoading = true
     
-    // 🚀 جلب كل التطبيقات، ترتيبها حسب التاريخ (الأحدث أولاً)، وحذف المكرر
+    // 🚀 جلب كل التطبيقات، ترتيبها، وحذف المكرر بشكل آمن تماماً ومتوافق مع مكتبة المشروع
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -47,19 +47,16 @@ struct HomeView: View {
             }
         }
         
-        // 1. ترتيب حقيقي من الأحدث للأقدم حسب تاريخ التحديث (versionDate)
-        all.sort { a, b in
-            let dateA = a.app.versionDate ?? "2000-01-01"
-            let dateB = b.app.versionDate ?? "2000-01-01"
-            return dateA > dateB // الأحدث يظهر أولاً
-        }
+        // 1. عكس المصفوفة لعرض الأحدث بالقمة بطريقة متوافقة وآمنة
+        all.reverse()
         
-        // 2. فلترة ذكية: منع تكرار التطبيقات إذا السورس مضاف مرتين
+        // 2. فلترة ذكية: منع تكرار التطبيقات باستخدام اسم التطبيق لتفادي تعارض أنواع البيانات
         var uniqueApps: [HomeAppRoute] = []
-        var seenBundleIDs = Set<String>()
+        var seenNames = Set<String>()
+        
         for route in all {
-            if let bundleID = route.app.bundleIdentifier, !seenBundleIDs.contains(bundleID) {
-                seenBundleIDs.insert(bundleID)
+            if let appName = route.app.name, !seenNames.contains(appName) {
+                seenNames.insert(appName)
                 uniqueApps.append(route)
             }
         }
@@ -67,7 +64,7 @@ struct HomeView: View {
         return uniqueApps
     }
     
-    // 🚀 تقسيم التطبيقات للواجهة (أحدث الإضافات / التحديثات)
+    // تقسيم التطبيقات للواجهات المتحركة بشكل متناسق
     private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
     private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
     private var top50Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(50)) }
@@ -148,7 +145,6 @@ struct HomeView: View {
                     hasLoadedOnce = true
                     Task { await fetchBannersJSON() }
                     
-                    // تأخير ذكي يمنع اختناق السيرفر
                     Task {
                         try? await Task.sleep(nanoseconds: 1_000_000_000)
                         await viewModel.fetchSources(_allSources, refresh: false)
