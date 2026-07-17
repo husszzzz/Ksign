@@ -36,7 +36,32 @@ struct HomeView: View {
     @State private var loadedRepositories: [ASRepository] = []
     @State private var isAppsLoading = true
     
-    // 🚀 التطبيقات المصفوفة من الأحدث إلى الأقدم (بدون تكرار)
+    // 🚀 1. جلب تطبيقات السورس الخاص بك فقط (تطبيقاتنا المميزة)
+    private var featuredApps: [HomeAppRoute] {
+        var all: [HomeAppRoute] = []
+        for source in _allSources {
+            if let repo = viewModel.sources[source] {
+                // الفحص بناءً على وجود كلمة Hassany في اسم السورس
+                if let sourceName = repo.name, sourceName.localizedCaseInsensitiveContains("Hassany") {
+                    for app in repo.apps {
+                        all.append(HomeAppRoute(source: repo, app: app))
+                    }
+                }
+            }
+        }
+        
+        var uniqueApps: [HomeAppRoute] = []
+        var seenNames = Set<String>()
+        for route in all.reversed() { // الأحدث أولاً
+            if let appName = route.app.name, !seenNames.contains(appName) {
+                seenNames.insert(appName)
+                uniqueApps.append(route)
+            }
+        }
+        return uniqueApps
+    }
+    
+    // 🚀 2. التطبيقات العامة المصفوفة من الأحدث إلى الأقدم (بدون تكرار)
     private var allAppsSorted: [HomeAppRoute] {
         var all: [HomeAppRoute] = []
         for source in _allSources {
@@ -47,22 +72,18 @@ struct HomeView: View {
             }
         }
         
-        // 1. السورس مرتب من الأحدث للأقدم أصلاً، لذا نمر عليه بشكل طبيعي
         var uniqueApps: [HomeAppRoute] = []
         var seenNames = Set<String>()
-        
         for route in all {
             if let appName = route.app.name, !seenNames.contains(appName) {
                 seenNames.insert(appName)
                 uniqueApps.append(route)
             }
         }
-        
-        // 2. النتيجة أصبحت الأحدث أولاً بدون أي تكرار
         return uniqueApps
     }
     
-    // تقسيم التطبيقات للواجهات المتحركة (الشريط يعرض 12 تطبيق)
+    // تقسيم التطبيقات للواجهات المتحركة
     private var top12Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
     private var bottom12Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
     
@@ -108,7 +129,23 @@ struct HomeView: View {
                             } else {
                                 VStack(alignment: .leading, spacing: 30) {
                                     
-                                    // ---- السطر الأول (أحدث الإضافات) ----
+                                    // ---- السطر الجديد (تطبيقاتنا المميزة حصرياً) ----
+                                    if !featuredApps.isEmpty {
+                                        VStack(alignment: .leading, spacing: 15) {
+                                            HStack {
+                                                Text("تطبيقاتنا المميزة 🌟").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
+                                                Spacer()
+                                                NavigationLink(destination: TopAppsListView(apps: featuredApps, title: "تطبيقاتنا المميزة")) {
+                                                    Text("عرض الكل ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
+                                                }
+                                            }.padding(.horizontal, 20)
+                                            
+                                            // الحركة بالعكس حتى تنطي جمالية
+                                            ContinuousMarquee(apps: featuredApps, moveLeft: false)
+                                        }
+                                    }
+                                    
+                                    // ---- السطر الثاني (أحدث الإضافات) ----
                                     VStack(alignment: .leading, spacing: 15) {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
@@ -121,7 +158,7 @@ struct HomeView: View {
                                         ContinuousMarquee(apps: top12Apps, moveLeft: true)
                                     }
                                     
-                                    // ---- السطر الثاني (آخر التحديثات) ----
+                                    // ---- السطر الثالث (آخر التحديثات) ----
                                     if !bottom12Apps.isEmpty {
                                         VStack(alignment: .leading, spacing: 15) {
                                             HStack {
