@@ -3,6 +3,19 @@
   "identifier": "com.hassanystore.source",
   "apps": [
     {
+      "name": "Telegram Dark",
+      "bundleIdentifier": "Telegram Dark.hassanyIPA",
+      "developerName": "@hassanyIPA",
+      "version": "12.7",
+      "versionDate": "2026-07-17T16:15:57.486Z",
+      "versionDescription": "إصدار جديد.",
+      "downloadURL": "https://dl.ikiraplus.workers.dev/dl/teledark_12.7",
+      "localizedDescription": "نسخه تدعم الإشعارات ",
+      "iconURL": "https://raw.githubusercontent.com/ikiraplus/ipastore/main/images/app-1773512283014.png",
+      "size": 46137344,
+      "tintColor": "a855f7"
+    },
+    {
       "name": "Video start",
       "bundleIdentifier": "com.video.hassanyIPA.mod",
       "developerName": "hassanyIPA",
