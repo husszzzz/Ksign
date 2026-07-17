@@ -47,25 +47,26 @@ struct HomeView: View {
             }
         }
         
-        // 1. إزالة التكرار مع الاحتفاظ بآخر ظهور (الأحدث) لكل اسم
+        // 1. السورس مرتب من الأحدث للأقدم أصلاً، لذا نمر عليه بشكل طبيعي
         var uniqueApps: [HomeAppRoute] = []
         var seenNames = Set<String>()
-        // المرور من النهاية إلى البداية لضمان أن أول ظهور نلتقطه هو الأحدث
-        for route in all.reversed() {
+        
+        for route in all {
             if let appName = route.app.name, !seenNames.contains(appName) {
                 seenNames.insert(appName)
                 uniqueApps.append(route)
             }
         }
-        // 2. النتيجة أصبحت الأحدث أولاً ثم الأقدم بدون تكرار
+        
+        // 2. النتيجة أصبحت الأحدث أولاً بدون أي تكرار
         return uniqueApps
     }
     
-    // تقسيم التطبيقات للواجهات المتحركة
-    private var top10Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
-    private var bottom10Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
+    // تقسيم التطبيقات للواجهات المتحركة (الشريط يعرض 12 تطبيق)
+    private var top12Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(12)) }
+    private var bottom12Apps: [HomeAppRoute] { allAppsSorted.count > 12 ? Array(allAppsSorted.dropFirst(12).prefix(12)) : [] }
     
-    // تقسيمات جديدة 25 تطبيق لكل صفحة "اكتشف المزيد"
+    // تقسيمات "اكتشف المزيد" (25 تطبيق لكل صفحة)
     private var top25Apps: [HomeAppRoute] { Array(allAppsSorted.prefix(25)) }
     private var second25Apps: [HomeAppRoute] {
         guard allAppsSorted.count > 25 else { return [] }
@@ -112,26 +113,26 @@ struct HomeView: View {
                                         HStack {
                                             Text("أحدث الإضافات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                             Spacer()
-                                            NavigationLink(destination: Top50AppsView(apps: top25Apps)) {
+                                            NavigationLink(destination: TopAppsListView(apps: top25Apps, title: "أحدث الإضافات")) {
                                                 Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                             }
                                         }.padding(.horizontal, 20)
                                         
-                                        ContinuousMarquee(apps: top10Apps, moveLeft: true)
+                                        ContinuousMarquee(apps: top12Apps, moveLeft: true)
                                     }
                                     
                                     // ---- السطر الثاني (آخر التحديثات) ----
-                                    if !bottom10Apps.isEmpty {
+                                    if !bottom12Apps.isEmpty {
                                         VStack(alignment: .leading, spacing: 15) {
                                             HStack {
                                                 Text("آخر التحديثات").font(.system(size: 20, weight: .bold)).foregroundColor(.white)
                                                 Spacer()
-                                                NavigationLink(destination: Top50AppsView(apps: second25Apps)) {
+                                                NavigationLink(destination: TopAppsListView(apps: second25Apps, title: "آخر التحديثات")) {
                                                     Text("اكتشف المزيد ➔").font(.system(size: 14, weight: .bold)).foregroundColor(.purple)
                                                 }
                                             }.padding(.horizontal, 20)
                                             
-                                            ContinuousMarquee(apps: bottom10Apps, moveLeft: false)
+                                            ContinuousMarquee(apps: bottom12Apps, moveLeft: false)
                                         }
                                     }
                                 }
@@ -300,9 +301,11 @@ struct VIPPackagesView: View {
     }
 }
 
-// MARK: - صفحة أحدث 25 تطبيق (أو 25 التالية)
-struct Top50AppsView: View {
+// MARK: - صفحة قائمة التطبيقات (عرض المزيد) تقبل عنوان مخصص
+struct TopAppsListView: View {
     let apps: [HomeAppRoute]
+    let title: String
+    
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -313,7 +316,7 @@ struct Top50AppsView: View {
                     }
                 }.padding(16)
             }
-        }.navigationTitle("أحدث التطبيقات").navigationBarTitleDisplayMode(.inline)
+        }.navigationTitle(title).navigationBarTitleDisplayMode(.inline)
     }
 }
 
