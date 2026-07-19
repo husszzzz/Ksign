@@ -3,6 +3,19 @@
   "identifier": "com.hassanystore.source",
   "apps": [
     {
+      "name": "8ball pool",
+      "bundleIdentifier": "8ballpoll.hasaany.com",
+      "developerName": "@hassanyIPA",
+      "version": "56.27.0",
+      "versionDate": "2026-07-19T15:20:52.915Z",
+      "versionDescription": "إصدار جديد.",
+      "downloadURL": "https://cdn.i3rby.com/out/pool8Signed.ipa",
+      "localizedDescription": "لعب تلقائي عصى طويله وغيرها من المميزات ",
+      "iconURL": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/24/3d/52/243d5254-14b1-70ac-ff13-2643fcc50336/AppIcon-0-0-1x_U007emarketing-0-8-0-85-220.png/350x350.png",
+      "size": 69206016,
+      "tintColor": "a855f7"
+    },
+    {
       "name": "Telegram Dark",
       "bundleIdentifier": "Telegram Dark.hassanyIPA",
       "developerName": "@hassanyIPA",
